@@ -1,5 +1,6 @@
 ﻿#include <iostream>
 #include <cstring>
+#include <vector>
 #include <cstdio>
 using namespace std;
 #define cmdCreateFile "createFile"
@@ -19,7 +20,10 @@ using namespace std;
 #define INDIRECT_BLOCK_NUM 1
 
 #pragma region Struct
+class INODE
+{
 
+};
 #pragma endregion
 
 
@@ -78,11 +82,42 @@ void cat(char* file)
 // 解析并处理cmd
 void parse(char* cmd)
 {
+	// cmd分段
+	static vector<char*> vec;
+	static bool head = 1;
+	vec.clear();
+	for (int i = 0; cmd[i]; i++)
+	{
+		if (cmd[i] != ' ' && head == 1)
+		{
+			vec.push_back(cmd + i);
+			head = 0;
+		}
+		if (cmd[i] == ' ')
+		{
+			head = 1;
+			cmd[i] = '\0';
+		}
+	}
+	for (const char* item : vec)
+	{
+		printf("%s\n", item);
+	}
+	if (vec.size() == 0) return; // 无内容返回
+	if (strcmp(vec[0], cmdCreateFile) == 0)
+	{
 
+	}
+	else if (strcmp(vec[0], cmdDeleteFile) == 0)
+	{
+
+	}
 }
 #pragma endregion
 
 int main()
 {
-
+	char s[100];
+	scanf("%[^\n]", s);
+	parse(s);
 }
