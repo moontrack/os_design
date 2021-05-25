@@ -23,7 +23,7 @@ typedef unsigned int uint;
 #define INDIRECT_BLOCK_NUM 1
 
 #pragma region Struct
-// size=60
+// size=64
 struct INODE
 {
 	uint ino;                                   // INODE号
