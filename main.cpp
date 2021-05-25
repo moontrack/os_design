@@ -112,6 +112,38 @@ void parse(char* cmd)
 	{
 
 	}
+	else if (strcmp(vec[0], cmdCreateDir) == 0)
+	{
+
+	}
+	else if (strcmp(vec[0], cmdDeleteDir) == 0)
+	{
+
+	}
+	else if (strcmp(vec[0], cmdChangeDir) == 0)
+	{
+
+	}
+	else if (strcmp(vec[0], cmdDir) == 0)
+	{
+
+	}
+	else if (strcmp(vec[0], cmdCp) == 0)
+	{
+
+	}
+	else if (strcmp(vec[0], cmdSum) == 0)
+	{
+
+	}
+	else if (strcmp(vec[0], cmdCat) == 0)
+	{
+
+	}
+	else
+	{
+		printf("无法识别命令%s\n", vec[0]);
+	}
 }
 #pragma endregion
 
