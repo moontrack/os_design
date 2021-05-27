@@ -5,17 +5,18 @@
 using namespace std;
 typedef unsigned int uint;
 typedef unsigned short ushort;
-#define cmdHelp "help"
-#define cmdCreateFile "createFile"
-#define cmdDeleteFile "deleteFile"
-#define cmdCreateDir "createDir"
-#define cmdDeleteDir "deleteDir"
-#define cmdChangeDir "changeDir"
-#define cmdDir "dir"
-#define cmdCp "cp"
-#define cmdSum "sum"
-#define cmdCat "cat"
-#define cmdExit "exit"
+const char* cmdHelp = "help";
+const char* cmdCreateFile = "createFile";
+const char* cmdDeleteFile = "deleteFile";
+const char* cmdCreateDir = "createDir";
+const char* cmdDeleteDir = "deleteDir";
+const char* cmdChangeDir = "changeDir";
+const char* cmdDir = "dir";
+const char* cmdCp = "cp";
+const char* cmdSum = "sum";
+const char* cmdCat = "cat";
+const char* cmdExit = "exit";
+const char* STR_FILE_SYSTEM = "filesystem.mt";
 
 #pragma region PreCal
 // TOTAL = 16 MB 
@@ -31,27 +32,28 @@ typedef unsigned short ushort;
 // 1 + 1 + 16 + 16 + 615 + 15730 = 16379
 #pragma endregion
 
-#define MAX_STORAGE_SIZE 16777216		// 最大磁盘空间 16 * 1024 * 1024 = 16777216
-#define INODE_NUM 15730					// INODE数目
-#define BLOCK_SIZE 1024					// BLOCK大小 = 1 KB
-#define BLOCK_NUM 15730					// BLOCK数目
-#define ADDRESS_LEN 3					// 地址长度 = 3 B
-#define DIRECT_BLOCK_NUM 10				// 直接访问
-#define INDIRECT_BLOCK_NUM 1			// 间接访问
-#define DIRECTORY_SIZE 20				// 目录大小
-#define FILE_NAME_LEN 20				// 文件名长度
-#define SUPER_BLOCK_START 1				// 超级块起点
-#define INODE_BITMAP_START 2			// INODE位图起点
-#define BLOCK_BITMAP_START 18			// BLOCK位图起点
-#define INODE_START 34					// INODE区起点
-#define ROOT_DIRECTORY_START 649		// 根目录起点
-#define STORAGE_START 650				// 文件和目录起点
+const int MAX_STORAGE_SIZE = 16777216;		// 最大磁盘空间 16 * 1024 * 1024 = 16777216
+const ushort INODE_NUM = 15730;		// INODE数目
+const ushort BLOCK_SIZE = 1024;		// BLOCK大小 = 1 KB
+const ushort BLOCK_NUM = 15730;		// BLOCK数目
+const ushort ADDRESS_LEN = 3;	// 地址长度 = 3 B
+const ushort DIRECT_BLOCK_NUM = 10;		// 直接访问
+const ushort INDIRECT_BLOCK_NUM = 1;	// 间接访问
+const ushort DIRECTORY_SIZE = 20;	// 目录大小
+const ushort FILE_NAME_LEN = 20;	// 文件名长度
+const ushort SUPER_BLOCK_START = 1;		// 超级块起点
+const ushort INODE_BITMAP_START = 2;	// INODE位图起点
+const ushort BLOCK_BITMAP_START = 18;	// BLOCK位图起点
+const ushort INODE_START = 34;		// INODE区起点
+const ushort ROOT_DIRECTORY_START = 649;	// 根目录起点
+const ushort STORAGE_START = 650;	// 文件和目录起点
 
 
 #pragma region Struct
 // 引导块 超级块 空闲空间管理 INODE 根目录 文件和目录
 // 1      1      16 + 16      615   1       15730 
 // 0      1      2    18      34    649     650
+
 // size = 40
 struct INODE
 {
@@ -93,10 +95,42 @@ SuperBlock superBlock;
 bool inodeBitmap[INODE_NUM];
 bool blockBitmap[BLOCK_NUM];
 Directory curDirectory;
+FILE* file;											// 文件系统
 #pragma endregion
 
 #pragma region Function
-
+// 初始化，读入
+bool init()
+{
+	file = fopen(STR_FILE_SYSTEM, "wb+");
+	if (file == NULL)
+	{
+		return 0;
+	}
+	return 1;
+}
+// 结束时执行
+bool close()
+{
+	if (fclose(file) == -1)
+	{
+		return 0;
+	}
+	return 1;
+}
+// 读取对应ino的INODE
+inline void readINODE(const ushort& ino, INODE& inode)
+{
+	fseek(file, INODE_START + ino * sizeof(INODE), 0);
+	fread(&inode, sizeof(INODE), 1, file);
+}
+// 写入对应ino的INODE
+inline void writeINODE(const ushort& ino, INODE& inode)
+{
+	fseek(file, INODE_START + ino * sizeof(INODE), 0);
+	fwrite(&inode, sizeof(INODE), 1, file);
+}
+// 
 #pragma endregion
 
 
