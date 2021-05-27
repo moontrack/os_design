@@ -4,6 +4,7 @@
 #include <cstdio>
 using namespace std;
 typedef unsigned int uint;
+typedef unsigned short ushort;
 #define cmdHelp "help"
 #define cmdCreateFile "createFile"
 #define cmdDeleteFile "deleteFile"
@@ -16,48 +17,59 @@ typedef unsigned int uint;
 #define cmdCat "cat"
 #define cmdExit "exit"
 
-#define MAX_STORAGE_SIZE 16777216 //最大磁盘空间 16 * 1024 * 1024 = 16777216
-#define INODE_SIZE 64
-#define INODE_NUM 100
-#define BLOCK_SIZE 1024
-#define BLOCK_NUM 100
-#define ADDRESS_LEN 3
-#define DIRECT_BLOCK_NUM 10
-#define INDIRECT_BLOCK_NUM 1
-#define DIRECTORY_SIZE 20
-#define FILE_NAME_LEN 20
+#pragma region PreCal
+// TOTAL = 16 MB 
+// BLOCK_SIZE = 1 KB
+// BLOCK_NUM = 16 * 1024 = (1<<14) = 16384
+// 所以24b地址长度中只有14b有效，为方便起见，使用unsigned short模拟24b地址长度
 
-// INODE_SIZE = 64 B
-// INODE_NUM = ?
-// SuperBlock_SIZE = 16 B
-// BLOCK_SIZE = 1024 B
-// BLOCK_NUM = ?
-// INODE_SIZE * INODE_NUM + BLOCK_SIZE * BLOCK_NUM + SuperBlock_SIZE = 16MB = 16777216 B
+// X = BLOCK_NUM = INODE_NUM
+// INODE_SIZE = 40
+// 1 + 1 + (X / 1024) + (X / 1024) + (INODE_SIZE * X / 1024) + (X) = 16384
+// (1 + 1 + 40 + 1024)[1066] * X / 1024 = 16382
+// X = 15730
+// 1 + 1 + 16 + 16 + 615 + 15730 = 16379
+#pragma endregion
 
-// X * (64 + 1024) + 16 = 16777216
+#define MAX_STORAGE_SIZE 16777216		// 最大磁盘空间 16 * 1024 * 1024 = 16777216
+#define INODE_NUM 15730					// INODE数目
+#define BLOCK_SIZE 1024					// BLOCK大小 = 1 KB
+#define BLOCK_NUM 15730					// BLOCK数目
+#define ADDRESS_LEN 3					// 地址长度 = 3 B
+#define DIRECT_BLOCK_NUM 10				// 直接访问
+#define INDIRECT_BLOCK_NUM 1			// 间接访问
+#define DIRECTORY_SIZE 20				// 目录大小
+#define FILE_NAME_LEN 20				// 文件名长度
+#define SUPER_BLOCK_START 1				// 超级块起点
+#define INODE_BITMAP_START 2			// INODE位图起点
+#define BLOCK_BITMAP_START 18			// BLOCK位图起点
+#define INODE_START 34					// INODE区起点
+#define ROOT_DIRECTORY_START 649		// 根目录起点
+#define STORAGE_START 650				// 文件和目录起点
 
 
 #pragma region Struct
 // 引导块 超级块 空闲空间管理 INODE 根目录 文件和目录
-
-// size=64
+// 1      1      16 + 16      615   1       15730 
+// 0      1      2    18      34    649     650
+// size = 40
 struct INODE
 {
-	uint ino;                                   // INODE号
-	uint direct[DIRECT_BLOCK_NUM];              // 直接
-	uint indirect[INDIRECT_BLOCK_NUM];          // 间接
-	uint links;                                 // 链接数
-	uint size;                                  // 大小
-	uint createTime;                            // 时间
-	int fmode;                                  // 文件类型
+	ushort ino;										// INODE号
+	ushort direct[DIRECT_BLOCK_NUM];				// 直接
+	ushort indirect[INDIRECT_BLOCK_NUM];			// 间接
+	ushort links;									// 链接数
+	uint size;										// 大小
+	uint createTime;								// 时间
+	int fmode;										// 文件类型 0 = 文件夹 1 = 文件
 };
-// 超级块 size = ?
+// 超级块
 struct SuperBlock
 {
-	uint inodeNum;
-	uint finodeNum;
-	uint blockNum;
-	uint fblockNum;
+	ushort inodeNum;								// INODE总数
+	ushort finodeNum;								// 空闲INODE总数
+	ushort blockNum;								// BLOCK总数
+	ushort fblockNum;								// 空闲BLOCK总数
 };
 // 文件夹元素
 struct DirectoryElement
@@ -68,19 +80,21 @@ struct DirectoryElement
 // 文件夹
 struct Directory
 {
-	
+	DirectoryElement item[DIRECTORY_SIZE];
 };
 
 SuperBlock superBlock;
 bool inodeBitmap[INODE_NUM];
 bool blockBitmap[BLOCK_NUM];
-// INODE区: INODE_SIZE * INODE_NUM = ?
-// 根目录及文件目录信息: BLOCK_SIZE * BLOCK_NUM = ?
 Directory curDirectory;
 #pragma endregion
 
+#pragma region Function
 
-#pragma region COMMAND
+#pragma endregion
+
+
+#pragma region Command
 // 启动载入磁盘
 void Start()
 {
@@ -241,9 +255,14 @@ int main()
 {
 	// test //
 	printf("INODE size = %d\n", sizeof(INODE));
-	printf("bool_size = %d\n", sizeof(bool));
+	printf("DirectoryElement size = %d\n", sizeof(DirectoryElement));
+	printf("Directory size = %d\n", sizeof(Directory));
+	printf("bool size = %d\n", sizeof(bool));
 	uint test_A = -1;
 	printf("%u\n", test_A);
+	printf("%d\n", 16 * 1024);
+	ushort test_B = -1;
+	printf("%u\n", test_B);
 	// end  //
 
 	Welcome();
