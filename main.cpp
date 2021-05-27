@@ -17,12 +17,29 @@ typedef unsigned int uint;
 #define cmdExit "exit"
 
 #define MAX_STORAGE_SIZE 16777216 //最大磁盘空间 16 * 1024 * 1024 = 16777216
+#define INODE_SIZE 64
+#define INODE_NUM 100
 #define BLOCK_SIZE 1024
+#define BLOCK_NUM 100
 #define ADDRESS_LEN 3
 #define DIRECT_BLOCK_NUM 10
 #define INDIRECT_BLOCK_NUM 1
+#define DIRECTORY_SIZE 20
+#define FILE_NAME_LEN 20
+
+// INODE_SIZE = 64 B
+// INODE_NUM = ?
+// SuperBlock_SIZE = 16 B
+// BLOCK_SIZE = 1024 B
+// BLOCK_NUM = ?
+// INODE_SIZE * INODE_NUM + BLOCK_SIZE * BLOCK_NUM + SuperBlock_SIZE = 16MB = 16777216 B
+
+// X * (64 + 1024) + 16 = 16777216
+
 
 #pragma region Struct
+// 引导块 超级块 空闲空间管理 INODE 根目录 文件和目录
+
 // size=64
 struct INODE
 {
@@ -34,8 +51,33 @@ struct INODE
 	uint createTime;                            // 时间
 	int fmode;                                  // 文件类型
 };
-#pragma endregion
+// 超级块 size = ?
+struct SuperBlock
+{
+	uint inodeNum;
+	uint finodeNum;
+	uint blockNum;
+	uint fblockNum;
+};
+// 文件夹元素
+struct DirectoryElement
+{
+	char fileName[FILE_NAME_LEN];
+	uint ino;
+};
+// 文件夹
+struct Directory
+{
+	
+};
 
+SuperBlock superBlock;
+bool inodeBitmap[INODE_NUM];
+bool blockBitmap[BLOCK_NUM];
+// INODE区: INODE_SIZE * INODE_NUM = ?
+// 根目录及文件目录信息: BLOCK_SIZE * BLOCK_NUM = ?
+Directory curDirectory;
+#pragma endregion
 
 
 #pragma region COMMAND
@@ -199,6 +241,9 @@ int main()
 {
 	// test //
 	printf("INODE size = %d\n", sizeof(INODE));
+	printf("bool_size = %d\n", sizeof(bool));
+	uint test_A = -1;
+	printf("%u\n", test_A);
 	// end  //
 
 	Welcome();
