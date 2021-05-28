@@ -22,7 +22,7 @@ const char* STR_FILE_SYSTEM = "filesystem.mt";
 // TOTAL = 16 MB 
 // BLOCK_SIZE = 1 KB
 // BLOCK_NUM = 16 * 1024 = (1<<14) = 16384
-// 所以24b地址长度中只有14b有效，为方便起见，使用unsigned short模拟24b地址长度
+// 所以24b地址长度中只有14b有效，为方便起见，使用short模拟24b地址长度[-32768,32767]
 
 // X = BLOCK_NUM = INODE_NUM
 // INODE_SIZE = 40
@@ -32,21 +32,21 @@ const char* STR_FILE_SYSTEM = "filesystem.mt";
 // 1 + 1 + 16 + 16 + 615 + 15730 = 16379
 #pragma endregion
 
-const int MAX_STORAGE_SIZE = 16777216;		// 最大磁盘空间 16 * 1024 * 1024 = 16777216
-const ushort INODE_NUM = 15730;		// INODE数目
-const ushort BLOCK_SIZE = 1024;		// BLOCK大小 = 1 KB
-const ushort BLOCK_NUM = 15730;		// BLOCK数目
-const ushort ADDRESS_LEN = 3;	// 地址长度 = 3 B
-const ushort DIRECT_BLOCK_NUM = 10;		// 直接访问
-const ushort INDIRECT_BLOCK_NUM = 1;	// 间接访问
-const ushort DIRECTORY_SIZE = 20;	// 目录大小
-const ushort FILE_NAME_LEN = 20;	// 文件名长度
-const ushort SUPER_BLOCK_START = 1;		// 超级块起点
-const ushort INODE_BITMAP_START = 2;	// INODE位图起点
-const ushort BLOCK_BITMAP_START = 18;	// BLOCK位图起点
-const ushort INODE_START = 34;		// INODE区起点
-const ushort ROOT_DIRECTORY_START = 649;	// 根目录起点
-const ushort STORAGE_START = 650;	// 文件和目录起点
+const int MAX_STORAGE_SIZE = 16777216;					// 最大磁盘空间 16 * 1024 * 1024 = 16777216
+const short INODE_NUM = 15730;							// INODE数目
+const short BLOCK_SIZE = 1024;							// BLOCK大小 = 1 KB
+const short BLOCK_NUM = 15730;							// BLOCK数目
+const short ADDRESS_LEN = 3;							// 地址长度 = 3 B
+const short DIRECT_BLOCK_NUM = 10;						// 直接访问
+const short INDIRECT_BLOCK_NUM = 1;						// 间接访问
+const short DIRECTORY_SIZE = 20;						// 目录大小
+const short FILE_NAME_LEN = 20;							// 文件名长度
+const int SUPER_BLOCK_START = 1 * BLOCK_SIZE;			// 超级块起点
+const int INODE_BITMAP_START = 2 * BLOCK_SIZE;			// INODE位图起点
+const int BLOCK_BITMAP_START = 18 * BLOCK_SIZE;			// BLOCK位图起点
+const int INODE_START = 34 * BLOCK_SIZE;				// INODE区起点
+const int ROOT_DIRECTORY_START = 649 * BLOCK_SIZE;		// 根目录起点
+const int STORAGE_START = 650 * BLOCK_SIZE;				// 文件和目录起点
 
 
 #pragma region Struct
@@ -57,60 +57,294 @@ const ushort STORAGE_START = 650;	// 文件和目录起点
 // size = 40
 struct INODE
 {
-	ushort ino;										// INODE号
-	ushort directBlock[DIRECT_BLOCK_NUM];			// 直接
-	ushort indirectBlock[INDIRECT_BLOCK_NUM];		// 间接
-	ushort links;									// 链接数
-	uint size;										// 大小
-	uint createTime;								// 时间
-	int fmode;										// 文件类型 0 = 文件夹 1 = 文件
+	short ino;											// INODE号
+	short links;										// 链接数
+	short directBlock[DIRECT_BLOCK_NUM];				// 直接
+	short indirectBlock[INDIRECT_BLOCK_NUM];			// 间接
+	int size;											// 大小
+	int createTime;										// 时间
+	int fmode;											// 文件类型 0 = 文件夹 1 = 文件
 };
 // 间接寻址块
 struct IndirectionBlock
 {
-	ushort order;
-	ushort nxtBlock[BLOCK_SIZE / ADDRESS_LEN];
+	short order;
+	short nxtBlock[BLOCK_SIZE / ADDRESS_LEN];
 };
 // 超级块
 struct SuperBlock
 {
-	ushort inodeNum;								// INODE总数
-	ushort finodeNum;								// 空闲INODE总数
-	ushort blockNum;								// BLOCK总数
-	ushort fblockNum;								// 空闲BLOCK总数
+	short inodeNum;										// INODE总数
+	short finodeNum;									// 空闲INODE总数
+	short blockNum;										// BLOCK总数
+	short fblockNum;									// 空闲BLOCK总数
 };
 // 文件夹元素
 struct DirectoryElement
 {
 	char fileName[FILE_NAME_LEN];
-	uint ino;
+	short ino;
 };
 // 文件夹
 struct Directory
 {
 	DirectoryElement item[DIRECTORY_SIZE];
+	void Init()
+	{
+		for (int i = 0; i < DIRECTORY_SIZE; i++)
+		{
+			memset(item[i].fileName, 0, sizeof(item[i].fileName));
+			item[i].ino = -1;
+		}
+	}
 };
 
 SuperBlock superBlock;
-bool inodeBitmap[INODE_NUM];
-bool blockBitmap[BLOCK_NUM];
+bool inodeBitmap[INODE_NUM];							// 0 表示未使用
+bool blockBitmap[BLOCK_NUM];							// 0 表示未使用
 Directory curDirectory;
-FILE* file;											// 文件系统
+FILE* file;												// 文件系统
 #pragma endregion
 
-#pragma region Function
+#pragma region File_Function
+// 读取对应idx的INODE
+inline void ReadINODE(const short& idx, INODE& item);
+// 写入对应idx的INODE
+inline void WriteINODE(const short& idx, INODE& item);
+// 读取超级块
+inline void ReadSuperBlock(SuperBlock& item);
+// 写入超级块
+inline void WriteSuperBlock(SuperBlock& item);
+// 读取inodeBitmap
+inline void ReadBitmapINODE();
+// 单点读取inodeBitmap
+inline void ReadSingleBitmapINODE(const short& idx);
+// 写入inodeBitmap
+inline void WriteBitmapINODE();
+// 单点写入inodeBitmap
+inline void WriteSingleBitmapINODE(const short& idx);
+// 读取根目录
+inline void ReadRootDirectory(Directory& item);
+// 写入根目录
+inline void WriteRootDirectory(Directory& item);
+// 读取Storage中的文件夹数据
+inline void ReadDirectory(const short& idx, Directory& item);
+// 写入Storage中的文件夹数据
+inline void WriteDirectory(const short& idx, Directory& item);
+// 读取Storage中的文件数据
+inline void ReadStorageData(const short& idx, char* item);
+// 写入Storage中的文件数据
+inline void WriteStorageData(const short& idx, char* item);
+#pragma endregion
+
+#pragma region Op_Function
+// 找到一个空闲INODE的idx 找不到返回-1
+short FindFreeINODE();
+// 找到是否有足够大小的block 否返回-1 否则返回第一个找到的block
+short FindFreeBlock(const int& size);
 // 初始化，读入
-bool init()
+bool Init();
+// 结束时执行
+bool Close();
+
+#pragma endregion
+
+#pragma region Command
+// 启动载入磁盘
+void Start();
+// 帮助信息
+void Help();
+// 欢迎信息
+void WelcomeMsg();
+// 启动
+void Welcome();
+// 创建文件 createFile fileName fileSize (KB)
+void CreateFile(char* fileName, char* fileSize);
+// 删除文件 deleteFile fileName
+void DeleteFile(char* fileName);
+// 创建文件夹 createDir dirName
+void CreateDir(char* dirName);
+// 删除文件夹 deleteDir dirName
+void DeleteDir(char* dirName);
+// 改变当前工作路径 changeDir path
+void ChangeDir(char* path);
+// 列出当前目录下的文件和子目录及对应信息(SIZE CREATETIME) dir
+void Dir();
+// 复制文件 cp file1 file2
+void Cp(char* file1, char* file2);
+// 显示空间使用信息 sum
+void Sum();
+// 打印文件内容 cat file
+void Cat(char* file);
+// 退出，将内容写入磁盘
+void Exit();
+// 解析并处理cmd 
+// 退出返回0
+bool Parse(char* cmd);
+#pragma endregion
+
+int main()
 {
-	file = fopen(STR_FILE_SYSTEM, "wb+");
+	// test //
+	printf("INODE size = %d\n", sizeof(INODE));
+	printf("IndirectionBlock size = %d\n", sizeof(IndirectionBlock));
+	printf("SuperBlock size = %d\n", sizeof(SuperBlock));
+	printf("DirectoryElement size = %d\n", sizeof(DirectoryElement));
+	printf("Directory size = %d\n", sizeof(Directory));
+	printf("superBlock size = %d\n", sizeof(superBlock));
+	printf("inodeBitmap size = %d\n", sizeof(inodeBitmap));
+	printf("blockBitmap size = %d\n", sizeof(blockBitmap));
+	printf("curDirectory size = %d\n", sizeof(curDirectory));
+	int test_A = -1;
+	printf("%d\n", test_A);
+	printf("%d\n", 16 * 1024);
+	short test_B = -1;
+	printf("%d\n", test_B);
+	//////////
+
+	// end  //
+
+	Welcome();
+	char input[100];
+	while (true)
+	{
+		scanf("%[^\n]", input); getchar();
+		if (!Parse(input)) break;
+	}
+}
+
+#pragma region File_Function
+// 读取对应idx的INODE
+inline void ReadINODE(const short& idx, INODE& item)
+{
+	fseek(file, INODE_START + idx * sizeof(INODE), 0);
+	fread(&item, sizeof(INODE), 1, file);
+}
+// 写入对应idx的INODE
+inline void WriteINODE(const short& idx, INODE& item)
+{
+	fseek(file, INODE_START + idx * sizeof(INODE), 0);
+	fwrite(&item, sizeof(INODE), 1, file);
+}
+// 读取超级块
+inline void ReadSuperBlock(SuperBlock& item)
+{
+	fseek(file, SUPER_BLOCK_START, 0);
+	fread(&item, sizeof(SuperBlock), 1, file);
+}
+// 写入超级块
+inline void WriteSuperBlock(SuperBlock& item)
+{
+	fseek(file, SUPER_BLOCK_START, 0);
+	fwrite(&item, sizeof(SuperBlock), 1, file);
+}
+// 读取inodeBitmap
+inline void ReadBitmapINODE()
+{
+	fseek(file, INODE_BITMAP_START, 0);
+	fread(inodeBitmap, sizeof(inodeBitmap), 1, file);
+}
+// 单点读取inodeBitmap
+inline void ReadSingleBitmapINODE(const short& idx)
+{
+	fseek(file, INODE_BITMAP_START + idx * sizeof(bool), 0);
+	fread(inodeBitmap + idx, sizeof(bool), 1, file);
+}
+// 写入inodeBitmap
+inline void WriteBitmapINODE()
+{
+	fseek(file, INODE_BITMAP_START, 0);
+	fwrite(inodeBitmap, sizeof(inodeBitmap), 1, file);
+}
+// 单点写入inodeBitmap
+inline void WriteSingleBitmapINODE(const short& idx)
+{
+	fseek(file, INODE_BITMAP_START + idx * sizeof(bool), 0);
+	fwrite(inodeBitmap + idx, sizeof(bool), 1, file);
+}
+// 读取根目录
+inline void ReadRootDirectory(Directory& item)
+{
+	fseek(file, ROOT_DIRECTORY_START, 0);
+	fread(&item, sizeof(Directory), 1, file);
+}
+// 写入根目录
+inline void WriteRootDirectory(Directory& item)
+{
+	fseek(file, ROOT_DIRECTORY_START, 0);
+	fwrite(&item, sizeof(Directory), 1, file);
+}
+// 读取Storage中的文件夹数据
+inline void ReadDirectory(const short& idx, Directory& item)
+{
+	fseek(file, STORAGE_START + idx * BLOCK_SIZE, 0);
+	fread(&item, sizeof(Directory), 1, file);
+}
+// 写入Storage中的文件夹数据
+inline void WriteDirectory(const short& idx, Directory& item)
+{
+	fseek(file, STORAGE_START + idx * BLOCK_SIZE, 0);
+	fwrite(&item, sizeof(Directory), 1, file);
+}
+// 读取Storage中的文件数据
+inline void ReadStorageData(const short& idx, char* item)
+{
+	fseek(file, STORAGE_START + idx * BLOCK_SIZE, 0);
+	fread(item, BLOCK_SIZE, 1, file);
+}
+// 写入Storage中的文件数据
+inline void WriteStorageData(const short& idx, char* item)
+{
+	fseek(file, STORAGE_START + idx * BLOCK_SIZE, 0);
+	fwrite(item, BLOCK_SIZE, 1, file);
+}
+#pragma endregion
+
+#pragma region Op_Function
+// 找到一个空闲INODE的idx 找不到返回-1
+short FindFreeINODE()
+{
+	static short idx = 0;
+	if (superBlock.finodeNum <= 0) return -1;
+	while (inodeBitmap[idx] == 0)
+	{
+		idx++;
+		if (idx >= INODE_NUM) idx -= INODE_NUM;
+	}
+	return idx;
+}
+// 找到是否有足够大小的block 否返回-1 否则返回第一个找到的block
+// size(KB == BLOCK_NUM)
+short FindFreeBlock(const int& size)
+{
+	static short idx = 0;
+	if (superBlock.fblockNum < size) return -1;
+
+}
+// 初始化，读入
+bool Init()
+{
+	file = fopen(STR_FILE_SYSTEM, "r");
 	if (file == NULL)
 	{
-		return 0;
+		printf("未找到对应文件，正在创建并初始化...\n");
+		superBlock.inodeNum = superBlock.fblockNum = INODE_NUM;
+		superBlock.blockNum = superBlock.fblockNum = BLOCK_NUM;
+		memset(inodeBitmap, 0, sizeof(inodeBitmap));
+		memset(blockBitmap, 0, sizeof(blockBitmap));
+		curDirectory.Init();
+
+		printf("初始化完毕\n");
+	}
+	else
+	{
+		fclose(file);
+		file = fopen(STR_FILE_SYSTEM, "wb+");
 	}
 	return 1;
 }
 // 结束时执行
-bool close()
+bool Close()
 {
 	if (fclose(file) == -1)
 	{
@@ -118,34 +352,27 @@ bool close()
 	}
 	return 1;
 }
-// 读取对应ino的INODE
-inline void readINODE(const ushort& ino, INODE& inode)
-{
-	fseek(file, INODE_START + ino * sizeof(INODE), 0);
-	fread(&inode, sizeof(INODE), 1, file);
-}
-// 写入对应ino的INODE
-inline void writeINODE(const ushort& ino, INODE& inode)
-{
-	fseek(file, INODE_START + ino * sizeof(INODE), 0);
-	fwrite(&inode, sizeof(INODE), 1, file);
-}
-// 
-#pragma endregion
 
+#pragma endregion
 
 #pragma region Command
 // 启动载入磁盘
 void Start()
 {
 	printf("开始载入...\n");
-	// function
-	printf("载入完成\n");
+	if (Init())
+	{
+		printf("载入完成\n");
+	}
+	else
+	{
+		printf("载入失败\n");
+	}
 }
 // 帮助信息
 void Help()
 {
-	 
+
 }
 // 欢迎信息
 void WelcomeMsg()
@@ -221,7 +448,7 @@ void Exit()
 }
 // 解析并处理cmd 
 // 退出返回0
-bool parse(char* cmd)
+bool Parse(char* cmd)
 {
 	// cmd分段
 	static vector<char*> vec;
@@ -300,31 +527,3 @@ bool parse(char* cmd)
 	return 1;
 }
 #pragma endregion
-
-int main()
-{
-	// test //
-	printf("INODE size = %d\n", sizeof(INODE));
-	printf("IndirectionBlock size = %d\n", sizeof(IndirectionBlock));
-	printf("SuperBlock size = %d\n", sizeof(SuperBlock));
-	printf("DirectoryElement size = %d\n", sizeof(DirectoryElement));
-	printf("Directory size = %d\n", sizeof(Directory));
-	printf("superBlock size = %d\n", sizeof(superBlock));
-	printf("inodeBitmap size = %d\n", sizeof(inodeBitmap));
-	printf("blockBitmap size = %d\n", sizeof(blockBitmap));
-	printf("curDirectory size = %d\n", sizeof(curDirectory));
-	uint test_A = -1;
-	printf("%u\n", test_A);
-	printf("%d\n", 16 * 1024);
-	ushort test_B = -1;
-	printf("%u\n", test_B);
-	// end  //
-
-	Welcome();
-	char input[100];
-	while (true)
-	{
-		scanf("%[^\n]", input); getchar();
-		if (!parse(input)) break;
-	}
-}
