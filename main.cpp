@@ -195,8 +195,6 @@ void DeleteINODE(const short& idx);
 void DeleteINODE(INODE& item);
 // 初始化，读入
 bool Init();
-// 结束时执行
-bool Close();
 
 #pragma endregion
 
@@ -228,8 +226,8 @@ void Cp(char* file1, char* file2);
 void Sum();
 // 打印文件内容 cat file
 void Cat(char* file);
-// 退出，将内容写入磁盘
-void Exit();
+// 退出
+bool Exit();
 // 解析并处理cmd 
 // 退出返回0
 bool Parse(char* cmd);
@@ -415,7 +413,7 @@ int str2int(char* str)
 // 获取随机数据
 char* GetRandData()
 {
-	for (int i = 0; i < BLOCK_SIZE; i++) randData[i] = rand() % 256;
+	for (int i = 0; i < BLOCK_SIZE; i++) randData[i] = rand() % 256, putchar(randData[i]);
 	return randData;
 }
 // 占用inode 更改bitmap、superBlock
@@ -631,15 +629,6 @@ bool Init()
 	ReadBitmapBlock();
 	ReadDirectory(0, curDirectory);
 	printf("读入数据完毕\n");
-	return 1;
-}
-// 结束时执行
-bool Close()
-{
-	if (fclose(file) == -1)
-	{
-		return 0;
-	}
 	return 1;
 }
 
@@ -986,11 +975,7 @@ void Cat(char* file)
 		return;
 	}
 	short curSize = inodeTmp.size;
-	if (inodeTmp.size > LIMIT_ONE_INDIRECT_BLOCK)
-	{
-
-	}
-	else if (inodeTmp.size > LIMIT_DIRECT_BLOCK)
+	if (inodeTmp.size > LIMIT_DIRECT_BLOCK)
 	{
 		for (int i = 0; i < DIRECT_BLOCK_NUM && curSize > 0; i++)
 		{
@@ -1000,17 +985,62 @@ void Cat(char* file)
 				return;
 			}
 			ReadStorageData(inodeTmp.directBlock[i], randData);
-			for (int i = 0; i < BLOCK_SIZE; i++) putchar(randData[i]);
+			for (int ii = 0; ii < BLOCK_SIZE; ii++) putchar(randData[i]);
 			curSize--;
 		}
-		IndirectionBlock one;
+		IndirectionBlock one, two;
 		for (int i = 0; i < INDIRECT_BLOCK_NUM && curSize > 0; i++)
 		{
 			if (inodeTmp.indirectBlock[i] == -1)
 			{
-				
+				printf("数据块缺失\n");
+				return;
+			}
+			ReadIndirectionBlock(inodeTmp.indirectBlock[i], one);
+			if (one.order == 1)
+			{
+				for (int j = 0; j < INDIRECT_BLOCK_NUM && curSize > 0; j++)
+				{
+					if (one.nxtBlock[j] == -1)
+					{
+						printf("数据块缺失\n");
+						return;
+					}
+					ReadIndirectionBlock(one.nxtBlock[j], two);
+					for (int k = 0; k < INDIRECT_BLOCK_NUM && curSize > 0; k++)
+					{
+						if (two.nxtBlock[k] == -1)
+						{
+							printf("数据块缺失\n");
+							return;
+						}
+						ReadStorageData(two.nxtBlock[k], randData);
+						for (int ii = 0; ii < BLOCK_SIZE; ii++) putchar(randData[i]);
+						curSize--;
+					}
+				}
+			}
+			else if (one.order == 0)
+			{
+				for (int j = 0; j < INDIRECT_BLOCK_NUM && curSize > 0; j++)
+				{
+					if (one.nxtBlock[j] == -1)
+					{
+						printf("数据块缺失\n");
+						return;
+					}
+					ReadStorageData(one.nxtBlock[j], randData);
+					for (int ii = 0; ii < BLOCK_SIZE; ii++) putchar(randData[i]);
+					curSize--;
+				}
+			}
+			else
+			{
+				printf("未知错误\n");
+				return;
 			}
 		}
+		putchar('\n');
 	}
 	else
 	{
@@ -1022,15 +1052,20 @@ void Cat(char* file)
 				return;
 			}
 			ReadStorageData(inodeTmp.directBlock[i], randData);
-			for (int i = 0; i < BLOCK_SIZE; i++) putchar(randData[i]);
+			for (int ii = 0; ii < BLOCK_SIZE; ii++) putchar(randData[i]);
 			curSize--;
 		}
+		putchar('\n');
 	}
 }
-// 退出，将内容写入磁盘
-void Exit()
+// 退出
+bool Exit()
 {
-
+	if (fclose(file) == -1)
+	{
+		return 0;
+	}
+	return 1;
 }
 // 解析并处理cmd 
 // 退出返回0
@@ -1164,7 +1199,7 @@ bool Parse(char* cmd)
 	}
 	else if (strcmp(vec[0], cmdExit) == 0)
 	{
-		if (Close())
+		if (Exit())
 		{
 			printf("已退出系统\n");
 		}
