@@ -483,6 +483,7 @@ short FindFreeINODE()
 short FindFreeBlock(const int& size)
 {
 	static short idx = 0;
+	if (size <= 0) return -1;
 	if (superBlock.fblockNum < size) return -1;
 	while (blockBitmap[idx] != 0)
 	{
@@ -515,6 +516,16 @@ void DeleteINODE(INODE& item)
 	// 无链接删除
 	if (item.fmode == 0)
 	{
+		INODE inodeTmp;
+		Directory dirTmp;
+		ReadDirectory(item.directBlock[0], dirTmp);
+		for (int i = 0; i < DIRECTORY_SIZE; i++)
+		{
+			if (dirTmp.item[i].ino != -1)
+			{
+				DeleteINODE(dirTmp.item[i].ino);
+			}
+		}
 		relINODE(item.ino);
 		if (item.directBlock[0] == -1)
 		{
@@ -895,7 +906,7 @@ void CreateFile(char* fileName, char* strFileSize)
 				IndirectionBlock two;
 				two.init();
 				two.order = 0;
-				for (int k = 0; k < MUL_INDIRECT_BLOCK_NUM; k++)
+				for (int k = 0; k < MUL_INDIRECT_BLOCK_NUM && fileSize > 0; k++)
 				{
 					two.nxtBlock[k] = FindFreeBlock(fileSize--);
 					if (two.nxtBlock[k] == -1)
