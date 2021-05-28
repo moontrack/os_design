@@ -42,6 +42,7 @@ const short DIRECT_BLOCK_NUM = 10;						// 直接访问
 const short INDIRECT_BLOCK_NUM = 1;						// 间接访问
 const short DIRECTORY_SIZE = 20;						// 目录大小
 const short FILE_NAME_LEN = 20;							// 文件名长度
+const short PATH_NAME_LEN = 400;						// 路径长度
 const int SUPER_BLOCK_START = 1 * BLOCK_SIZE;			// 超级块起点
 const int INODE_BITMAP_START = 2 * BLOCK_SIZE;			// INODE位图起点
 const int BLOCK_BITMAP_START = 18 * BLOCK_SIZE;			// BLOCK位图起点
@@ -175,13 +176,13 @@ bool Close();
 
 #pragma region Command
 // 启动载入磁盘
-void Start();
+bool Start();
 // 帮助信息
 void Help();
 // 欢迎信息
 void WelcomeMsg();
 // 启动
-void Welcome();
+bool Welcome();
 // 创建文件 createFile fileName fileSize (KB)
 void CreateFile(char* fileName, char* fileSize);
 // 删除文件 deleteFile fileName
@@ -229,12 +230,14 @@ int main()
 	GetCurTime();
 	// end  //
 
-	Welcome();
-	char input[100];
-	while (true)
+	if (Welcome())
 	{
-		scanf("%[^\n]", input); getchar();
-		if (!Parse(input)) break;
+		char input[PATH_NAME_LEN];
+		while (true)
+		{
+			scanf("%[^\n]", input); getchar();
+			if (!Parse(input)) break;
+		}
 	}
 }
 
@@ -464,16 +467,19 @@ bool Close()
 
 #pragma region Command
 // 启动载入磁盘
-void Start()
+char curPathName[PATH_NAME_LEN] = "";					// 当前路径
+bool Start()
 {
 	printf("开始载入...\n");
 	if (Init())
 	{
 		printf("载入完成\n");
+		return 1;
 	}
 	else
 	{
-		printf("载入失败\n");
+		printf("载入失败，退出系统\n");
+		return 0;
 	}
 }
 // 帮助信息
@@ -498,10 +504,14 @@ void WelcomeMsg()
 	Help();
 }
 // 启动
-void Welcome()
+bool Welcome()
 {
-	Start();
+	if (!Start())
+	{
+		return 0;
+	}
 	WelcomeMsg();
+	return 1;
 }
 // 创建文件 createFile fileName fileSize (KB)
 void CreateFile(char* fileName, char* fileSize)
@@ -586,39 +596,102 @@ bool Parse(char* cmd)
 	}
 	else if (strcmp(vec[0], cmdCreateFile) == 0)
 	{
-		CreateFile(vec[1], vec[2]);
+		if (vec.size() != 3)
+		{
+			printf("%s命令参数数目错误\n");
+		}
+		else
+		{
+			CreateFile(vec[1], vec[2]);
+		}
 	}
 	else if (strcmp(vec[0], cmdDeleteFile) == 0)
 	{
-		DeleteFile(vec[1]);
+		if (vec.size() != 2)
+		{
+			printf("%s命令参数数目错误\n");
+		}
+		else
+		{
+			DeleteFile(vec[1]);
+		}
 	}
 	else if (strcmp(vec[0], cmdCreateDir) == 0)
 	{
-		CreateDir(vec[1]);
+		if (vec.size() != 2)
+		{
+			printf("%s命令参数数目错误\n");
+		}
+		else
+		{
+			CreateDir(vec[1]);
+		}
 	}
 	else if (strcmp(vec[0], cmdDeleteDir) == 0)
 	{
-		DeleteDir(vec[1]);
+		if (vec.size() != 2)
+		{
+			printf("%s命令参数数目错误\n");
+		}
+		else
+		{
+			DeleteDir(vec[1]);
+		}
 	}
 	else if (strcmp(vec[0], cmdChangeDir) == 0)
 	{
-		ChangeDir(vec[1]);
+		if (vec.size() != 2)
+		{
+			printf("%s命令参数数目错误\n");
+		}
+		else
+		{
+			ChangeDir(vec[1]);
+		}
 	}
 	else if (strcmp(vec[0], cmdDir) == 0)
 	{
-		Dir();
+		if (vec.size() != 1)
+		{
+			printf("%s命令参数数目错误\n");
+		}
+		else
+		{
+			Dir();
+		}
 	}
 	else if (strcmp(vec[0], cmdCp) == 0)
 	{
-		Cp(vec[1], vec[2]);
+		if (vec.size() != 3)
+		{
+			printf("%s命令参数数目错误\n");
+		}
+		else
+		{
+			Cp(vec[1], vec[2]);
+		}
 	}
 	else if (strcmp(vec[0], cmdSum) == 0)
 	{
-		Sum();
+		if (vec.size() != 1)
+		{
+			printf("%s命令参数数目错误\n");
+		}
+		else
+		{
+			Sum();
+		}
 	}
 	else if (strcmp(vec[0], cmdCat) == 0)
 	{
-		Cat(vec[1]);
+		if (vec.size() != 2)
+		{
+			printf("%s命令参数数目错误\n");
+		}
+		else
+		{
+			Cat(vec[1]);
+		}
 	}
 	else if (strcmp(vec[0], cmdExit) == 0)
 	{
