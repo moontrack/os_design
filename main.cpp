@@ -145,11 +145,21 @@ void Start()
 // 帮助信息
 void Help()
 {
-
+	 
 }
 // 欢迎信息
 void WelcomeMsg()
 {
+	cout << "* *************************** Chinese Group 16 *************************** *" << endl;
+	cout << "*                                                                          *" << endl;
+	cout << "*                     Welcome to our Unix file system!                     *" << endl;
+	cout << "*                                                                          *" << endl;
+	cout << "*         Members:		                                                    *" << endl;
+	cout << "*                          黄宗达 -- 201830570149                          *" << endl;
+	cout << "*                          徐自华 -- 201830570354                          *" << endl;
+	cout << "*                          王  葳 -- 201830570316                          *" << endl;
+	cout << "*                                                                          *" << endl;
+	cout << "* ************************************************************************ *" << endl << endl;
 	// function
 	Help();
 }
