@@ -191,6 +191,8 @@ short FindFreeBlock(const int& size);
 inline void RollBack();
 // 删除对应idx的INODE
 void DeleteINODE(const short& idx);
+// 删除对应INODE
+void DeleteINODE(INODE& item);
 // 初始化，读入
 bool Init();
 // 结束时执行
@@ -200,6 +202,7 @@ bool Close();
 
 #pragma region Command
 // 启动载入磁盘
+char curPathName[PATH_NAME_LEN] = "/";
 bool Start();
 // 帮助信息
 void Help();
@@ -253,6 +256,8 @@ int main()
 	short test_B = -1;
 	printf("%d\n", test_B);
 	printf("time_t size = %d\n", sizeof(time_t));
+	time_t tmpt = time(0);
+	printf("time_t = %s\n", ctime(&tmpt));
 	char test_str[40];
 	memset(test_str, 0, sizeof(test_str));
 	strcpy(test_str, "1231412412");
@@ -265,6 +270,7 @@ int main()
 		char input[PATH_NAME_LEN];
 		while (true)
 		{
+			printf("%s# ", curPathName);
 			scanf("%[^\n]", input); getchar();
 			if (!Parse(input)) break;
 		}
@@ -415,26 +421,38 @@ char* GetRandData()
 // 占用inode 更改bitmap、superBlock
 inline void useINODE(const int& idx)
 {
-	inodeBitmap[idx] = 1;
-	superBlock.finodeNum -= 1;
+	if (inodeBitmap[idx] == 0)
+	{
+		inodeBitmap[idx] = 1;
+		superBlock.finodeNum -= 1;
+	}
 }
 // 释放inode 更改bitmap、superBlock
 inline void relINODE(const int& idx)
 {
-	inodeBitmap[idx] = 0;
-	superBlock.finodeNum += 1;
+	if (inodeBitmap[idx] == 1)
+	{
+		inodeBitmap[idx] = 0;
+		superBlock.finodeNum += 1;
+	}
 }
 // 占用block 更改bitmap、superBlock
 inline void useBlock(const int& idx)
 {
-	blockBitmap[idx] = 1;
-	superBlock.fblockNum -= 1;
+	if (blockBitmap[idx] == 0)
+	{
+		blockBitmap[idx] = 1;
+		superBlock.fblockNum -= 1;
+	}
 }
 // 释放block 更改bitmap、superBlock
 inline void relBlock(const int& idx)
 {
-	blockBitmap[idx] = 0;
-	superBlock.fblockNum += 1;
+	if (blockBitmap[idx] == 1)
+	{
+		blockBitmap[idx] = 0;
+		superBlock.fblockNum += 1;
+	}
 }
 // 找到一个空闲INODE的idx 找不到返回-1
 short FindFreeINODE()
@@ -473,7 +491,87 @@ inline void RollBack()
 // 删除对应idx的INODE
 void DeleteINODE(const short& idx)
 {
+	INODE inodeTmp;
+	ReadINODE(idx, inodeTmp);
+	DeleteINODE(inodeTmp);
+}
+// 删除对应INODE
+void DeleteINODE(INODE& item)
+{
+	item.links--;
+	if (item.links > 0) return;
+	// 无链接删除
+	if (item.fmode == 0)
+	{
 
+		relINODE(item.ino);
+	}
+	else if (item.fmode == 1)
+	{
+		for (int i = 0; i < DIRECT_BLOCK_NUM; i++)
+		{
+			if (item.directBlock[i] != -1)
+			{
+				relBlock(item.directBlock[i]);
+				item.directBlock[i] = -1;
+			}
+		}
+		for (int i = 0; i < INDIRECT_BLOCK_NUM; i++)
+		{
+			if (item.indirectBlock[i] != -1)
+			{
+				IndirectionBlock one;
+				ReadIndirectionBlock(item.indirectBlock[i], one);
+				if (one.order == 1)
+				{
+					IndirectionBlock two;
+					for (int j = 0; j < INDIRECT_BLOCK_NUM; j++)
+					{
+						if (one.nxtBlock[j] != -1)
+						{
+							ReadIndirectionBlock(one.nxtBlock[j], two);
+							for (int k = 0; k < INDIRECT_BLOCK_NUM; k++)
+							{
+								if (two.nxtBlock[k] != -1)
+								{
+									relBlock(two.nxtBlock[k]);
+									two.nxtBlock[k] = -1;
+								}
+							}
+							relBlock(one.nxtBlock[j]);
+							one.nxtBlock[j] = -1;
+						}
+					}
+				}
+				else if (one.order == 0)
+				{
+					for (int j = 0; j < INDIRECT_BLOCK_NUM; j++)
+					{
+						if (one.nxtBlock[j] != -1)
+						{
+							relBlock(one.nxtBlock[j]);
+							one.nxtBlock[j] = -1;
+						}
+					}
+				}
+				else
+				{
+					printf("间接块回收错误，order = %d\n", one.order);
+				}
+				relBlock(item.indirectBlock[i]);
+				item.indirectBlock[i] = -1;
+			}
+		}
+		relINODE(item.ino);
+		WriteSuperBlock(superBlock);
+		WriteBitmapINODE();
+		WriteBitmapBlock();
+	}
+	else
+	{
+		printf("未知错误fmode\n");
+		return;
+	}
 }
 // 初始化，读入
 bool Init()
@@ -496,6 +594,7 @@ bool Init()
 		}
 		curDirectory.Init();
 		curDirectory.self.ino = inoIdx;
+		curDirectory.father.ino = inoIdx;
 		strcpy(curDirectory.self.fileName, "");
 		short blockIdx = FindFreeBlock(1);
 		if (blockIdx == -1)
@@ -546,9 +645,7 @@ bool Close()
 
 #pragma endregion
 
-#pragma region Command
-// 启动载入磁盘
-char curPathName[PATH_NAME_LEN] = "";					// 当前路径
+#pragma region Command				// 当前路径
 bool Start()
 {
 	printf("开始载入...\n");
@@ -604,6 +701,11 @@ void CreateFile(char* fileName, char* strFileSize)
 	}
 	short fileSize = str2int(strFileSize);
 	if (fileSize == -1) return;
+	if (fileSize == 0)
+	{
+		printf("请输入正整数\n");
+		return;
+	}
 	// fileSize -> blockSize
 	short blockSize = fileSize;
 	short indirectType = 0;
@@ -648,11 +750,12 @@ void CreateFile(char* fileName, char* strFileSize)
 	inode.createTime = time(0);
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
 	{
-		if (curDirectory.item[i].ino != -1)
+		if (curDirectory.item[i].ino == -1)
 		{
 			curDirectory.itemNum++;
 			strcpy(curDirectory.item[i].fileName, fileName);
 			curDirectory.item[i].ino = inoIdx;
+			break;
 		}
 	}
 	useINODE(inoIdx);
@@ -786,7 +889,38 @@ void CreateFile(char* fileName, char* strFileSize)
 // 删除文件 deleteFile fileName
 void DeleteFile(char* fileName)
 {
-
+	int inoIdx = -1;
+	for (int i = 0; i < DIRECTORY_SIZE; i++)
+	{
+		if (strcmp(fileName, curDirectory.item[i].fileName) == 0)
+		{
+			inoIdx = curDirectory.item[i].ino;
+			break;
+		}
+	}
+	if (inoIdx == -1)
+	{
+		printf("不存在对应文件\n");
+		return;
+	}
+	INODE inodeTmp;
+	ReadINODE(inoIdx, inodeTmp);
+	if (inodeTmp.fmode == 0)
+	{
+		printf("对应文件为文件夹，请使用deleteDir %s\n", fileName);
+		return;
+	}
+	for (int i = 0; i < DIRECTORY_SIZE; i++)
+	{
+		if (inoIdx == curDirectory.item[i].ino)
+		{
+			curDirectory.item[i].ino = -1;
+			memset(curDirectory.item[i].fileName, 0, sizeof(curDirectory.item[i].fileName));
+			break;
+		}
+	}
+	DeleteINODE(inodeTmp);
+	WriteDirectory(curDirectory.self.ino, curDirectory);
 }
 // 创建文件夹 createDir dirName
 void CreateDir(char* dirName)
@@ -806,7 +940,16 @@ void ChangeDir(char* path)
 // 列出当前目录下的文件和子目录及对应信息(SIZE CREATETIME) dir
 void Dir()
 {
-
+	INODE inodeTmp;
+	printf("%-20s %-20s %-20s %-30s\n", "Name", "Mode", "Size(KB)", "CreateTime");
+	for (int i = 0; i < DIRECTORY_SIZE; i++)
+	{
+		if (curDirectory.item[i].ino != -1)
+		{
+			ReadINODE(curDirectory.item[i].ino, inodeTmp);
+			printf("%-20s %-20s %-20d %-30s\n", curDirectory.item[i].fileName, inodeTmp.fmode == 1 ? "file" : "directory", inodeTmp.size, ctime(&inodeTmp.createTime));
+		}
+	}
 }
 // 复制文件 cp file1 file2
 void Cp(char* file1, char* file2)
@@ -821,7 +964,68 @@ void Sum()
 // 打印文件内容 cat file
 void Cat(char* file)
 {
+	INODE inodeTmp;
+	short inoIdx = -1;
+	for (int i = 0; i < DIRECTORY_SIZE; i++)
+	{
+		if (strcmp(file, curDirectory.item[i].fileName) == 0)
+		{
+			inoIdx = curDirectory.item[i].ino;
+			break;
+		}
+	}
+	if (inoIdx == -1)
+	{
+		printf("不存在文件%s\n", file);
+		return;
+	}
+	ReadINODE(inoIdx, inodeTmp);
+	if (inodeTmp.fmode == 0)
+	{
+		printf("文件%s是文件夹\n", file);
+		return;
+	}
+	short curSize = inodeTmp.size;
+	if (inodeTmp.size > LIMIT_ONE_INDIRECT_BLOCK)
+	{
 
+	}
+	else if (inodeTmp.size > LIMIT_DIRECT_BLOCK)
+	{
+		for (int i = 0; i < DIRECT_BLOCK_NUM && curSize > 0; i++)
+		{
+			if (inodeTmp.directBlock[i] == -1)
+			{
+				printf("数据块缺失\n");
+				return;
+			}
+			ReadStorageData(inodeTmp.directBlock[i], randData);
+			for (int i = 0; i < BLOCK_SIZE; i++) putchar(randData[i]);
+			curSize--;
+		}
+		IndirectionBlock one;
+		for (int i = 0; i < INDIRECT_BLOCK_NUM && curSize > 0; i++)
+		{
+			if (inodeTmp.indirectBlock[i] == -1)
+			{
+				
+			}
+		}
+	}
+	else
+	{
+		for (int i = 0; i < DIRECT_BLOCK_NUM && curSize > 0; i++)
+		{
+			if (inodeTmp.directBlock[i] == -1)
+			{
+				printf("数据块缺失\n");
+				return;
+			}
+			ReadStorageData(inodeTmp.directBlock[i], randData);
+			for (int i = 0; i < BLOCK_SIZE; i++) putchar(randData[i]);
+			curSize--;
+		}
+	}
 }
 // 退出，将内容写入磁盘
 void Exit()
@@ -850,10 +1054,10 @@ bool Parse(char* cmd)
 			cmd[i] = '\0';
 		}
 	}
-	for (const char* item : vec)
-	{
-		printf("%s\n", item);
-	}
+	//for (const char* item : vec)
+	//{
+	//	printf("%s\n", item);
+	//}
 	if (vec.size() == 0) return 1; // 无内容返回
 	if (strcmp(vec[0], cmdHelp) == 0)
 	{
