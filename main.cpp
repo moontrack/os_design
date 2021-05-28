@@ -84,6 +84,11 @@ struct IndirectionBlock
 {
 	short order;
 	short nxtBlock[MUL_INDIRECT_BLOCK_NUM];
+	void init()
+	{
+		order = 0;
+		memset(nxtBlock, -1, sizeof(nxtBlock));
+	}
 };
 // 超级块
 struct SuperBlock
@@ -102,9 +107,14 @@ struct DirectoryElement
 // 文件夹
 struct Directory
 {
-	DirectoryElement item[DIRECTORY_SIZE];
+	DirectoryElement item[DIRECTORY_SIZE], father, self;
+	short itemNum;
 	void Init()
 	{
+		itemNum = 0;
+		self.ino = father.ino = -1;
+		memset(father.fileName, 0, sizeof(father.fileName));
+		memset(self.fileName, 0, sizeof(self.fileName));
 		for (int i = 0; i < DIRECTORY_SIZE; i++)
 		{
 			memset(item[i].fileName, 0, sizeof(item[i].fileName));
@@ -146,6 +156,10 @@ inline void ReadSingleBitmapBlock(const short& idx);
 inline void WriteBitmapBlock();
 // 单点写入blockBitmap
 inline void WriteSingleBitmapBlock(const short& idx);
+// 读取间接块
+inline void ReadIndirectionBlock(const short& idx, IndirectionBlock& item);
+// 写入间接块
+inline void WriteIndirectionBlock(const short& idx, IndirectionBlock& item);
 // 读取Storage中的文件夹数据
 inline void ReadDirectory(const short& idx, Directory& item);
 // 写入Storage中的文件夹数据
@@ -173,6 +187,8 @@ inline void relBlock(const int& idx);
 short FindFreeINODE();
 // 找到是否有足够大小的block 否返回-1 否则返回第一个找到的block
 short FindFreeBlock(const int& size);
+// 回退 SuperBlock,Bitmap
+inline void RollBack();
 // 删除对应idx的INODE
 void DeleteINODE(const short& idx);
 // 初始化，读入
@@ -237,6 +253,10 @@ int main()
 	short test_B = -1;
 	printf("%d\n", test_B);
 	printf("time_t size = %d\n", sizeof(time_t));
+	char test_str[40];
+	memset(test_str, 0, sizeof(test_str));
+	strcpy(test_str, "1231412412");
+	printf("str %s\n", test_str);
 	//////////
 	// end  //
 
@@ -323,6 +343,18 @@ inline void WriteSingleBitmapBlock(const short& idx)
 {
 	fseek(file, BLOCK_BITMAP_START + idx * sizeof(bool), 0);
 	fwrite(blockBitmap + idx, sizeof(bool), 1, file);
+}
+// 读取间接块
+inline void ReadIndirectionBlock(const short& idx, IndirectionBlock& item)
+{
+	fseek(file, STORAGE_START + idx * BLOCK_SIZE, 0);
+	fread(&item, sizeof(IndirectionBlock), 1, file);
+}
+// 写入间接块
+inline void WriteIndirectionBlock(const short& idx, IndirectionBlock& item)
+{
+	fseek(file, STORAGE_START + idx * BLOCK_SIZE, 0);
+	fwrite(&item, sizeof(IndirectionBlock), 1, file);
 }
 // 读取Storage中的文件夹数据
 inline void ReadDirectory(const short& idx, Directory& item)
@@ -429,6 +461,15 @@ short FindFreeBlock(const int& size)
 	}
 	return idx++;
 }
+// 回退 SuperBlock,Bitmap
+inline void RollBack()
+{
+	ReadSuperBlock(superBlock);
+	short idx = curDirectory.self.ino;
+	ReadDirectory(idx, curDirectory);
+	ReadBitmapINODE();
+	ReadBitmapBlock();
+}
 // 删除对应idx的INODE
 void DeleteINODE(const short& idx)
 {
@@ -447,13 +488,15 @@ bool Init()
 		superBlock.blockNum = superBlock.fblockNum = BLOCK_NUM;
 		memset(inodeBitmap, 0, sizeof(inodeBitmap));
 		memset(blockBitmap, 0, sizeof(blockBitmap));
-		curDirectory.Init();
 		short inoIdx = FindFreeINODE();
 		if (inoIdx == -1)
 		{
 			printf("INODE空间不足，初始化失败\n");
 			return 0;
 		}
+		curDirectory.Init();
+		curDirectory.self.ino = inoIdx;
+		strcpy(curDirectory.self.fileName, "");
 		short blockIdx = FindFreeBlock(1);
 		if (blockIdx == -1)
 		{
@@ -579,7 +622,21 @@ void CreateFile(char* fileName, char* strFileSize)
 		printf("Block空间不足\n");
 		return;
 	}
+	// 检查是否重名
+	for (int i = 0; i < DIRECTORY_SIZE; i++)
+	{
+		if (strcmp(fileName, curDirectory.item[i].fileName) == 0)
+		{
+			printf("无法创建重名文件\n");
+			return;
+		}
+	}
 	// 分配INODE
+	if (curDirectory.itemNum >= DIRECTORY_SIZE)
+	{
+		printf("文件夹已满上限(20)\n");
+		return;
+	}
 	short inoIdx = FindFreeINODE();
 	if (inoIdx == -1) return;
 	INODE inode;
@@ -589,6 +646,15 @@ void CreateFile(char* fileName, char* strFileSize)
 	inode.links++;
 	inode.size = fileSize;
 	inode.createTime = time(0);
+	for (int i = 0; i < DIRECTORY_SIZE; i++)
+	{
+		if (curDirectory.item[i].ino != -1)
+		{
+			curDirectory.itemNum++;
+			strcpy(curDirectory.item[i].fileName, fileName);
+			curDirectory.item[i].ino = inoIdx;
+		}
+	}
 	useINODE(inoIdx);
 	// 分配Block
 	if (indirectType == 0)
@@ -598,10 +664,11 @@ void CreateFile(char* fileName, char* strFileSize)
 			inode.directBlock[i] = FindFreeBlock(fileSize--);
 			if (inode.directBlock[i] == -1)
 			{
-				printf("Block空间不足\n");
-				DeleteINODE(inoIdx);
+				printf("Block空间不足，已回退\n");
+				RollBack();
 				return;
 			}
+			WriteStorageData(inode.directBlock[i], GetRandData());
 			useBlock(inode.directBlock[i]);
 		}
 	}
@@ -612,43 +679,109 @@ void CreateFile(char* fileName, char* strFileSize)
 			inode.directBlock[i] = FindFreeBlock(fileSize--);
 			if (inode.directBlock[i] == -1)
 			{
-				printf("Block空间不足\n");
-				DeleteINODE(inoIdx);
+				printf("Block空间不足，已回退\n");
+				RollBack();
 				return;
 			}
 			WriteStorageData(inode.directBlock[i], GetRandData());
 			useBlock(inode.directBlock[i]);
-
 		}
 		for (int i = 0; i < INDIRECT_BLOCK_NUM && fileSize > 0; i++)
 		{
 			inode.indirectBlock[i] = FindFreeBlock(fileSize);
 			if (inode.indirectBlock[i] == -1)
 			{
-				printf("Block空间不足\n");
-				DeleteINODE(inoIdx);
+				printf("Block空间不足，已回退\n");
+				RollBack();
 				return;
 			}
 			useBlock(inode.indirectBlock[i]);
 			IndirectionBlock one;
+			one.init();
 			one.order = 0;
-			for (int j = 0; j < MUL_INDIRECT_BLOCK_NUM; j++)
+			for (int j = 0; j < MUL_INDIRECT_BLOCK_NUM && fileSize > 0; j++)
 			{
 				one.nxtBlock[j] = FindFreeBlock(fileSize--);
-				if (one.nxtBlock[j])
+				if (one.nxtBlock[j] == -1)
 				{
-					printf("Block空间不足\n");
-					DeleteINODE(inoIdx);
+					printf("Block空间不足，已回退\n");
+					RollBack();
+					return;
+				}
+				WriteStorageData(one.nxtBlock[j], GetRandData());
+				useBlock(one.nxtBlock[j]);
+			}
+			WriteIndirectionBlock(inode.indirectBlock[i], one);
+		}
+	}
+	else if (indirectType == 2)
+	{
+		for (int i = 0; i < DIRECT_BLOCK_NUM; i++)
+		{
+			inode.directBlock[i] = FindFreeBlock(fileSize--);
+			if (inode.directBlock[i] == -1)
+			{
+				printf("Block空间不足，已回退\n");
+				RollBack();
+				return;
+			}
+			WriteStorageData(inode.directBlock[i], GetRandData());
+			useBlock(inode.directBlock[i]);
+		}
+		for (int i = 0; i < INDIRECT_BLOCK_NUM && fileSize > 0; i++)
+		{
+			inode.indirectBlock[i] = FindFreeBlock(fileSize);
+			if (inode.indirectBlock[i] == -1)
+			{
+				printf("Block空间不足，已回退\n");
+				RollBack();
+				return;
+			}
+			useBlock(inode.indirectBlock[i]);
+			IndirectionBlock one;
+			one.init();
+			one.order = 1;
+			for (int j = 0; j < MUL_INDIRECT_BLOCK_NUM && fileSize > 0; j++)
+			{
+				one.nxtBlock[j] = FindFreeBlock(fileSize);
+				if (one.nxtBlock[j] == -1)
+				{
+					printf("Block空间不足，已回退\n");
+					RollBack();
 					return;
 				}
 				useBlock(one.nxtBlock[j]);
+				IndirectionBlock two;
+				two.init();
+				two.order = 0;
+				for (int k = 0; k < MUL_INDIRECT_BLOCK_NUM; k++)
+				{
+					two.nxtBlock[k] = FindFreeBlock(fileSize--);
+					if (two.nxtBlock[k] == -1)
+					{
+						printf("Block空间不足，已回退\n");
+						RollBack();
+						return;
+					}
+					WriteStorageData(two.nxtBlock[k], GetRandData());
+					useBlock(two.nxtBlock[k]);
+				}
+				WriteIndirectionBlock(one.nxtBlock[j], two);
 			}
+			WriteIndirectionBlock(inode.indirectBlock[i], one);
 		}
 	}
 	else
 	{
-
+		printf("未知错误，已回退\n");
+		RollBack();
+		return;
 	}
+	WriteDirectory(curDirectory.self.ino, curDirectory);
+	WriteINODE(inoIdx, inode);
+	WriteSuperBlock(superBlock);
+	WriteBitmapINODE();
+	WriteBitmapBlock();
 }
 // 删除文件 deleteFile fileName
 void DeleteFile(char* fileName)
