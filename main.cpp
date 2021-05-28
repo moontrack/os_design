@@ -2,6 +2,7 @@
 #include <cstring>
 #include <vector>
 #include <cstdio>
+#include <ctime>
 using namespace std;
 typedef unsigned int uint;
 typedef unsigned short ushort;
@@ -32,7 +33,7 @@ const char* STR_FILE_SYSTEM = "filesystem.mt";
 // 1 + 1 + 16 + 16 + 615 + 15730 = 16379
 #pragma endregion
 
-const int MAX_STORAGE_SIZE = 16777216;					// 最大磁盘空间 16 * 1024 * 1024 = 16777216
+const int MAX_STORAGE_SIZE = 16777216;					// 最大磁盘空间 16 * 1024 * 1024 = 16777216 B
 const short INODE_NUM = 15730;							// INODE数目
 const short BLOCK_SIZE = 1024;							// BLOCK大小 = 1 KB
 const short BLOCK_NUM = 15730;							// BLOCK数目
@@ -45,25 +46,34 @@ const int SUPER_BLOCK_START = 1 * BLOCK_SIZE;			// 超级块起点
 const int INODE_BITMAP_START = 2 * BLOCK_SIZE;			// INODE位图起点
 const int BLOCK_BITMAP_START = 18 * BLOCK_SIZE;			// BLOCK位图起点
 const int INODE_START = 34 * BLOCK_SIZE;				// INODE区起点
-const int ROOT_DIRECTORY_START = 649 * BLOCK_SIZE;		// 根目录起点
-const int STORAGE_START = 650 * BLOCK_SIZE;				// 文件和目录起点
+const int STORAGE_START = 649 * BLOCK_SIZE;				// 文件和目录起点
 
 
 #pragma region Struct
-// 引导块 超级块 空闲空间管理 INODE 根目录 文件和目录
-// 1      1      16 + 16      615   1       15730 
-// 0      1      2    18      34    649     650
+// 引导块 超级块 空闲空间管理 INODE 文件和目录
+// 1      1      16 + 16      615    15730 
+// 0      1      2    18      34     649
 
 // size = 40
 struct INODE
 {
 	short ino;											// INODE号
 	short links;										// 链接数
+	short size;											// 大小(KB)
 	short directBlock[DIRECT_BLOCK_NUM];				// 直接
 	short indirectBlock[INDIRECT_BLOCK_NUM];			// 间接
-	int size;											// 大小
-	int createTime;										// 时间
 	int fmode;											// 文件类型 0 = 文件夹 1 = 文件
+	time_t createTime;									// 时间
+	void init()
+	{
+		ino = -1;
+		links = 0;
+		size = 0;
+		memset(directBlock, -1, sizeof(directBlock));
+		memset(indirectBlock, -1, sizeof(indirectBlock));
+		fmode = -1;
+		createTime = time(0);
+	}
 };
 // 间接寻址块
 struct IndirectionBlock
@@ -102,7 +112,7 @@ struct Directory
 SuperBlock superBlock;
 bool inodeBitmap[INODE_NUM];							// 0 表示未使用
 bool blockBitmap[BLOCK_NUM];							// 0 表示未使用
-Directory curDirectory;
+Directory curDirectory;									// 当前打开的文件夹
 FILE* file;												// 文件系统
 #pragma endregion
 
@@ -123,10 +133,14 @@ inline void ReadSingleBitmapINODE(const short& idx);
 inline void WriteBitmapINODE();
 // 单点写入inodeBitmap
 inline void WriteSingleBitmapINODE(const short& idx);
-// 读取根目录
-inline void ReadRootDirectory(Directory& item);
-// 写入根目录
-inline void WriteRootDirectory(Directory& item);
+// 读取blockBitmap
+inline void ReadBitmapBlock();
+// 单点读取blockBitmap
+inline void ReadSingleBitmapBlock(const short& idx);
+// 写入blockBitmap
+inline void WriteBitmapBlock();
+// 单点写入blockBitmap
+inline void WriteSingleBitmapBlock(const short& idx);
 // 读取Storage中的文件夹数据
 inline void ReadDirectory(const short& idx, Directory& item);
 // 写入Storage中的文件夹数据
@@ -138,6 +152,16 @@ inline void WriteStorageData(const short& idx, char* item);
 #pragma endregion
 
 #pragma region Op_Function
+// 返回当前时间int
+int GetCurTime();
+// 占用inode 更改bitmap、superBlock
+inline void useINODE(const int& idx);
+// 释放inode 更改bitmap、superBlock
+inline void relINODE(const int& idx);
+// 占用block 更改bitmap、superBlock
+inline void useBlock(const int& idx);
+// 释放block 更改bitmap、superBlock
+inline void relBlock(const int& idx);
 // 找到一个空闲INODE的idx 找不到返回-1
 short FindFreeINODE();
 // 找到是否有足够大小的block 否返回-1 否则返回第一个找到的block
@@ -200,8 +224,9 @@ int main()
 	printf("%d\n", 16 * 1024);
 	short test_B = -1;
 	printf("%d\n", test_B);
+	printf("time_t size = %d\n", sizeof(time_t));
 	//////////
-
+	GetCurTime();
 	// end  //
 
 	Welcome();
@@ -262,17 +287,29 @@ inline void WriteSingleBitmapINODE(const short& idx)
 	fseek(file, INODE_BITMAP_START + idx * sizeof(bool), 0);
 	fwrite(inodeBitmap + idx, sizeof(bool), 1, file);
 }
-// 读取根目录
-inline void ReadRootDirectory(Directory& item)
+// 读取blockBitmap
+inline void ReadBitmapBlock()
 {
-	fseek(file, ROOT_DIRECTORY_START, 0);
-	fread(&item, sizeof(Directory), 1, file);
+	fseek(file, BLOCK_BITMAP_START, 0);
+	fread(blockBitmap, sizeof(blockBitmap), 1, file);
 }
-// 写入根目录
-inline void WriteRootDirectory(Directory& item)
+// 单点读取blockBitmap
+inline void ReadSingleBitmapBlock(const short& idx)
 {
-	fseek(file, ROOT_DIRECTORY_START, 0);
-	fwrite(&item, sizeof(Directory), 1, file);
+	fseek(file, BLOCK_BITMAP_START + idx * sizeof(bool), 0);
+	fread(blockBitmap + idx, sizeof(bool), 1, file);
+}
+// 写入blockBitmap
+inline void WriteBitmapBlock()
+{
+	fseek(file, BLOCK_BITMAP_START, 0);
+	fwrite(blockBitmap, sizeof(blockBitmap), 1, file);
+}
+// 单点写入blockBitmap
+inline void WriteSingleBitmapBlock(const short& idx)
+{
+	fseek(file, BLOCK_BITMAP_START + idx * sizeof(bool), 0);
+	fwrite(blockBitmap + idx, sizeof(bool), 1, file);
 }
 // 读取Storage中的文件夹数据
 inline void ReadDirectory(const short& idx, Directory& item)
@@ -301,12 +338,43 @@ inline void WriteStorageData(const short& idx, char* item)
 #pragma endregion
 
 #pragma region Op_Function
+// 返回当前时间int
+int GetCurTime()
+{
+	time_t curTime = time(0);
+	cout << curTime << endl;
+	return 0;
+}
+// 占用inode 更改bitmap、superBlock
+inline void useINODE(const int& idx)
+{
+	inodeBitmap[idx] = 1;
+	superBlock.finodeNum -= 1;
+}
+// 释放inode 更改bitmap、superBlock
+inline void relINODE(const int& idx)
+{
+	inodeBitmap[idx] = 0;
+	superBlock.finodeNum += 1;
+}
+// 占用block 更改bitmap、superBlock
+inline void useBlock(const int& idx)
+{
+	blockBitmap[idx] = 1;
+	superBlock.fblockNum -= 1;
+}
+// 释放block 更改bitmap、superBlock
+inline void relBlock(const int& idx)
+{
+	blockBitmap[idx] = 0;
+	superBlock.fblockNum += 1;
+}
 // 找到一个空闲INODE的idx 找不到返回-1
 short FindFreeINODE()
 {
 	static short idx = 0;
 	if (superBlock.finodeNum <= 0) return -1;
-	while (inodeBitmap[idx] == 0)
+	while (inodeBitmap[idx] != 0)
 	{
 		idx++;
 		if (idx >= INODE_NUM) idx -= INODE_NUM;
@@ -319,7 +387,12 @@ short FindFreeBlock(const int& size)
 {
 	static short idx = 0;
 	if (superBlock.fblockNum < size) return -1;
-
+	while (blockBitmap[idx] != 0)
+	{
+		idx++;
+		if (idx >= BLOCK_NUM) idx -= BLOCK_NUM;
+	}
+	return idx;
 }
 // 初始化，读入
 bool Init()
@@ -328,19 +401,53 @@ bool Init()
 	if (file == NULL)
 	{
 		printf("未找到对应文件，正在创建并初始化...\n");
-		superBlock.inodeNum = superBlock.fblockNum = INODE_NUM;
+		file = fopen(STR_FILE_SYSTEM, "wb");
+		superBlock.inodeNum = superBlock.finodeNum = INODE_NUM;
 		superBlock.blockNum = superBlock.fblockNum = BLOCK_NUM;
 		memset(inodeBitmap, 0, sizeof(inodeBitmap));
 		memset(blockBitmap, 0, sizeof(blockBitmap));
 		curDirectory.Init();
-
+		short inoIdx = FindFreeINODE();
+		if (inoIdx == -1)
+		{
+			printf("INODE空间不足，初始化失败\n");
+			return 0;
+		}
+		short blockIdx = FindFreeBlock(1);
+		if (blockIdx == -1)
+		{
+			printf("BLOCK空间不足，初始化失败\n");
+			return 0;
+		}
+		INODE inode;
+		inode.init();
+		inode.fmode = 0;
+		inode.ino = inoIdx;
+		inode.directBlock[0] = blockIdx;
+		inode.links = 1;
+		inode.size = 1;
+		inode.createTime = time(0);
+		useINODE(inoIdx);
+		useBlock(blockIdx);
+		WriteSuperBlock(superBlock);
+		WriteBitmapINODE();
+		WriteBitmapBlock();
+		WriteINODE(inoIdx, inode);
+		WriteDirectory(blockIdx, curDirectory);
 		printf("初始化完毕\n");
+		fclose(file);
 	}
 	else
 	{
 		fclose(file);
-		file = fopen(STR_FILE_SYSTEM, "wb+");
 	}
+	file = fopen(STR_FILE_SYSTEM, "rb+");
+	printf("正在读入数据\n");
+	ReadSuperBlock(superBlock);
+	ReadBitmapINODE();
+	ReadBitmapBlock();
+	ReadDirectory(0, curDirectory);
+	printf("读入数据完毕\n");
 	return 1;
 }
 // 结束时执行
@@ -479,45 +586,46 @@ bool Parse(char* cmd)
 	}
 	else if (strcmp(vec[0], cmdCreateFile) == 0)
 	{
-
+		CreateFile(vec[1], vec[2]);
 	}
 	else if (strcmp(vec[0], cmdDeleteFile) == 0)
 	{
-
+		DeleteFile(vec[1]);
 	}
 	else if (strcmp(vec[0], cmdCreateDir) == 0)
 	{
-
+		CreateDir(vec[1]);
 	}
 	else if (strcmp(vec[0], cmdDeleteDir) == 0)
 	{
-
+		DeleteDir(vec[1]);
 	}
 	else if (strcmp(vec[0], cmdChangeDir) == 0)
 	{
-
+		ChangeDir(vec[1]);
 	}
 	else if (strcmp(vec[0], cmdDir) == 0)
 	{
-
+		Dir();
 	}
 	else if (strcmp(vec[0], cmdCp) == 0)
 	{
-
+		Cp(vec[1], vec[2]);
 	}
 	else if (strcmp(vec[0], cmdSum) == 0)
 	{
-
+		Sum();
 	}
 	else if (strcmp(vec[0], cmdCat) == 0)
 	{
-
+		Cat(vec[1]);
 	}
 	else if (strcmp(vec[0], cmdExit) == 0)
 	{
-		printf("结束运行，保存数据中...\n");
-
-		printf("保存完毕\n");
+		if (Close())
+		{
+			printf("已退出系统\n");
+		}
 		return 0;
 	}
 	else
