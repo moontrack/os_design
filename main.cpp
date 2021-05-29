@@ -193,6 +193,10 @@ inline void relBlock(const int& idx);
 short FindFreeINODE();
 // 找到是否有足够大小的block 否返回-1 否则返回第一个找到的block
 short FindFreeBlock(const int& size);
+// 分离路径，并返回INODE 
+// ignore = 0 返回最后的INODE
+// ignore = 1 忽略最后的Name，返回前面的INODE，并且返回后面Name的char*
+char* Path2INODE(char* path, const int& ignore, INODE& item);
 // 回退 SuperBlock,Bitmap
 inline void RollBack();
 // 删除对应idx的INODE
@@ -293,110 +297,146 @@ int main()
 // 读取对应idx的INODE
 inline void ReadINODE(const short& idx, INODE& item)
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, INODE_START + idx * sizeof(INODE), 0);
 	fread(&item, sizeof(INODE), 1, file);
+	fclose(file);
 }
 // 写入对应idx的INODE
 inline void WriteINODE(const short& idx, INODE& item)
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, INODE_START + idx * sizeof(INODE), 0);
 	fwrite(&item, sizeof(INODE), 1, file);
+	fclose(file);
 }
 // 读取超级块
 inline void ReadSuperBlock(SuperBlock& item)
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, SUPER_BLOCK_START, 0);
 	fread(&item, sizeof(SuperBlock), 1, file);
+	fclose(file);
 }
 // 写入超级块
 inline void WriteSuperBlock(SuperBlock& item)
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, SUPER_BLOCK_START, 0);
 	fwrite(&item, sizeof(SuperBlock), 1, file);
+	fclose(file);
 }
 // 读取inodeBitmap
 inline void ReadBitmapINODE()
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, INODE_BITMAP_START, 0);
 	fread(inodeBitmap, sizeof(inodeBitmap), 1, file);
+	fclose(file);
 }
 // 单点读取inodeBitmap
 inline void ReadSingleBitmapINODE(const short& idx)
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, INODE_BITMAP_START + idx * sizeof(bool), 0);
 	fread(inodeBitmap + idx, sizeof(bool), 1, file);
+	fclose(file);
 }
 // 写入inodeBitmap
 inline void WriteBitmapINODE()
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, INODE_BITMAP_START, 0);
 	fwrite(inodeBitmap, sizeof(inodeBitmap), 1, file);
+	fclose(file);
 }
 // 单点写入inodeBitmap
 inline void WriteSingleBitmapINODE(const short& idx)
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, INODE_BITMAP_START + idx * sizeof(bool), 0);
 	fwrite(inodeBitmap + idx, sizeof(bool), 1, file);
+	fclose(file);
 }
 // 读取blockBitmap
 inline void ReadBitmapBlock()
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, BLOCK_BITMAP_START, 0);
 	fread(blockBitmap, sizeof(blockBitmap), 1, file);
+	fclose(file);
 }
 // 单点读取blockBitmap
 inline void ReadSingleBitmapBlock(const short& idx)
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, BLOCK_BITMAP_START + idx * sizeof(bool), 0);
 	fread(blockBitmap + idx, sizeof(bool), 1, file);
+	fclose(file);
 }
 // 写入blockBitmap
 inline void WriteBitmapBlock()
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, BLOCK_BITMAP_START, 0);
 	fwrite(blockBitmap, sizeof(blockBitmap), 1, file);
+	fclose(file);
 }
 // 单点写入blockBitmap
 inline void WriteSingleBitmapBlock(const short& idx)
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, BLOCK_BITMAP_START + idx * sizeof(bool), 0);
 	fwrite(blockBitmap + idx, sizeof(bool), 1, file);
+	fclose(file);
 }
 // 读取间接块
 inline void ReadIndirectionBlock(const short& idx, IndirectionBlock& item)
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, STORAGE_START + idx * BLOCK_SIZE, 0);
 	fread(&item, sizeof(IndirectionBlock), 1, file);
+	fclose(file);
 }
 // 写入间接块
 inline void WriteIndirectionBlock(const short& idx, IndirectionBlock& item)
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, STORAGE_START + idx * BLOCK_SIZE, 0);
 	fwrite(&item, sizeof(IndirectionBlock), 1, file);
+	fclose(file);
 }
 // 读取Storage中的文件夹数据
 inline void ReadDirectory(const short& idx, Directory& item)
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, STORAGE_START + idx * BLOCK_SIZE, 0);
 	fread(&item, sizeof(Directory), 1, file);
+	fclose(file);
 }
 // 写入Storage中的文件夹数据
 inline void WriteDirectory(const short& idx, Directory& item)
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, STORAGE_START + idx * BLOCK_SIZE, 0);
 	fwrite(&item, sizeof(Directory), 1, file);
+	fclose(file);
 }
 // 读取Storage中的文件数据
 inline void ReadStorageData(const short& idx, char* item)
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, STORAGE_START + idx * BLOCK_SIZE, 0);
 	fread(item, BLOCK_SIZE, 1, file);
+	fclose(file);
 }
 // 写入Storage中的文件数据
 inline void WriteStorageData(const short& idx, char* item)
 {
+	file = fopen(STR_FILE_SYSTEM, "rb+");
 	fseek(file, STORAGE_START + idx * BLOCK_SIZE, 0);
 	fwrite(item, BLOCK_SIZE, 1, file);
+	fclose(file);
 }
 #pragma endregion
 
@@ -492,6 +532,21 @@ short FindFreeBlock(const int& size)
 	}
 	return idx++;
 }
+// 分离路径，并返回INODE 
+// ignore = 0 引用返回最后的INODE，无返回值
+// ignore = 1 忽略最后的Name，返回前面的INODE，并且返回后面Name的char*
+char* Path2INODE(char* path, const int& ignore, INODE& item)
+{
+	Directory dirTmp;
+	dirTmp = curDirectory;
+	if (path[0] == '/') // 回到根节点
+	{
+		ReadDirectory(0, dirTmp);
+		path += 1;
+	}
+	short len = strlen(path);
+	return nullptr;
+}
 // 回退 SuperBlock,Bitmap
 inline void RollBack()
 {
@@ -556,12 +611,12 @@ void DeleteINODE(INODE& item)
 				if (one.order == 1)
 				{
 					IndirectionBlock two;
-					for (int j = 0; j < INDIRECT_BLOCK_NUM; j++)
+					for (int j = 0; j < MUL_INDIRECT_BLOCK_NUM; j++)
 					{
 						if (one.nxtBlock[j] != -1)
 						{
 							ReadIndirectionBlock(one.nxtBlock[j], two);
-							for (int k = 0; k < INDIRECT_BLOCK_NUM; k++)
+							for (int k = 0; k < MUL_INDIRECT_BLOCK_NUM; k++)
 							{
 								if (two.nxtBlock[k] != -1)
 								{
@@ -576,7 +631,7 @@ void DeleteINODE(INODE& item)
 				}
 				else if (one.order == 0)
 				{
-					for (int j = 0; j < INDIRECT_BLOCK_NUM; j++)
+					for (int j = 0; j < MUL_INDIRECT_BLOCK_NUM; j++)
 					{
 						if (one.nxtBlock[j] != -1)
 						{
@@ -644,19 +699,24 @@ bool Init()
 		inode.createTime = time(0);
 		useINODE(inoIdx);
 		useBlock(blockIdx);
-		WriteSuperBlock(superBlock);
-		WriteBitmapINODE();
-		WriteBitmapBlock();
-		WriteINODE(inoIdx, inode);
-		WriteDirectory(blockIdx, curDirectory);
+		fseek(file, SUPER_BLOCK_START, 0);
+		fwrite(&superBlock, sizeof(SuperBlock), 1, file);
+		fseek(file, INODE_BITMAP_START, 0);
+		fwrite(inodeBitmap, sizeof(inodeBitmap), 1, file);
+		fseek(file, BLOCK_BITMAP_START, 0);
+		fwrite(blockBitmap, sizeof(blockBitmap), 1, file);
+		fseek(file, INODE_START + inoIdx * sizeof(INODE), 0);
+		fwrite(&inode, sizeof(INODE), 1, file);
+		fseek(file, STORAGE_START + blockIdx * BLOCK_SIZE, 0);
+		fwrite(&curDirectory, sizeof(Directory), 1, file);
 		printf("初始化完毕\n");
-		fclose(file);
+		//fclose(file);
 	}
 	else
 	{
 		fclose(file);
 	}
-	file = fopen(STR_FILE_SYSTEM, "rb+");
+	//file = fopen(STR_FILE_SYSTEM, "rb+");
 	printf("正在读入数据\n");
 	ReadSuperBlock(superBlock);
 	ReadBitmapINODE();
@@ -963,6 +1023,7 @@ void DeleteFile(char* fileName)
 	{
 		if (inoIdx == curDirectory.item[i].ino)
 		{
+			curDirectory.itemNum -= 1;
 			curDirectory.item[i].ino = -1;
 			memset(curDirectory.item[i].fileName, 0, sizeof(curDirectory.item[i].fileName));
 			break;
@@ -1064,6 +1125,7 @@ void DeleteDir(char* dirName)
 	{
 		if (inoIdx == curDirectory.item[i].ino)
 		{
+			curDirectory.itemNum -= 1;
 			curDirectory.item[i].ino = -1;
 			memset(curDirectory.item[i].fileName, 0, sizeof(curDirectory.item[i].fileName));
 			break;
@@ -1146,7 +1208,14 @@ void Dir()
 		if (curDirectory.item[i].ino != -1)
 		{
 			ReadINODE(curDirectory.item[i].ino, inodeTmp);
-			printf("%-20s %-20s %-20d %s", curDirectory.item[i].fileName, inodeTmp.fmode == 1 ? "file" : "directory", inodeTmp.size, ctime(&inodeTmp.createTime));
+			if (inodeTmp.fmode == 0)
+			{
+				printf("%-20s %-20s %-20s %s", curDirectory.item[i].fileName, "directory", "", ctime(&inodeTmp.createTime));
+			}
+			else
+			{
+				printf("%-20s %-20s %-20d %s", curDirectory.item[i].fileName, "file", inodeTmp.size, ctime(&inodeTmp.createTime));
+			}
 		}
 	}
 }
@@ -1429,7 +1498,7 @@ void Cat(char* fileName)
 			ReadIndirectionBlock(inodeTmp.indirectBlock[i], one);
 			if (one.order == 1)
 			{
-				for (int j = 0; j < INDIRECT_BLOCK_NUM && curSize > 0; j++)
+				for (int j = 0; j < MUL_INDIRECT_BLOCK_NUM && curSize > 0; j++)
 				{
 					if (one.nxtBlock[j] == -1)
 					{
@@ -1437,7 +1506,7 @@ void Cat(char* fileName)
 						return;
 					}
 					ReadIndirectionBlock(one.nxtBlock[j], two);
-					for (int k = 0; k < INDIRECT_BLOCK_NUM && curSize > 0; k++)
+					for (int k = 0; k < MUL_INDIRECT_BLOCK_NUM && curSize > 0; k++)
 					{
 						if (two.nxtBlock[k] == -1)
 						{
@@ -1452,7 +1521,7 @@ void Cat(char* fileName)
 			}
 			else if (one.order == 0)
 			{
-				for (int j = 0; j < INDIRECT_BLOCK_NUM && curSize > 0; j++)
+				for (int j = 0; j < MUL_INDIRECT_BLOCK_NUM && curSize > 0; j++)
 				{
 					if (one.nxtBlock[j] == -1)
 					{
@@ -1491,11 +1560,9 @@ void Cat(char* fileName)
 // 退出
 bool Exit()
 {
-	if (fclose(file) == -1)
-	{
-		return 0;
-	}
-	return 1;
+	if (file == NULL) return 1;
+	else if (fclose(file) == 0) return 1;
+	else return 0;
 }
 // 解析并处理cmd 
 // 退出返回0
