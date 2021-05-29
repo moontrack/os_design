@@ -174,11 +174,10 @@ inline void WriteStorageData(const short& idx, char* item);
 #pragma region Op_Function
 // char[] -> int
 int str2int(char* str);
+// 获取INODE的完整路径
+char* CplPath(INODE item);
 // 固定数量char输出
-inline void putch(char ch, short number)
-{
-	while (number--) putchar(ch);
-}
+inline void putch(char ch, short number);
 // 获取随机数据
 char* GetRandData();
 // 占用inode 更改bitmap、superBlock
@@ -194,9 +193,11 @@ short FindFreeINODE();
 // 找到是否有足够大小的block 否返回-1 否则返回第一个找到的block
 short FindFreeBlock(const int& size);
 // 分离路径，并返回INODE 
-// ignore = 0 返回最后的INODE
-// ignore = 1 忽略最后的Name，返回前面的INODE，并且返回后面Name的char*
-char* Path2INODE(char* path, const int& ignore, INODE& item);
+// 返回最后的INODE
+bool Path2INODE(char* path, INODE& item);
+// 分离路径，并返回INODE 
+// 忽略最后的Name，返回前面的INODE，并且返回后面Name的char*
+bool Path2INODE(char* path, INODE& item, char*& ret);
 // 回退 SuperBlock,Bitmap
 inline void RollBack();
 // 删除对应idx的INODE
@@ -279,6 +280,8 @@ int main()
 	printf("%d\n", '~' - ' ');
 	printf("\n");
 	//////////
+	char strrr[] = "123";
+	printf("%s\n", strcat(strrr, "456"));
 	// end  //
 
 	if (Welcome())
@@ -464,6 +467,24 @@ int str2int(char* str)
 	}
 	return ret;
 }
+// 获取INODE的完整路径
+char* CplPath(INODE item)
+{
+	Directory dirTmp;
+	ReadDirectory(item.ino, dirTmp);
+	if (dirTmp.father.ino == dirTmp.self.ino)
+	{
+		curPathName[0] = '\0';
+		return curPathName;
+	}
+	ReadINODE(dirTmp.father.ino, item);
+	return strcat(strcat(CplPath(item),"/"), dirTmp.self.fileName);
+}
+// 固定数量char输出
+inline void putch(char ch, short number)
+{
+	while (number--) putchar(ch);
+}
 // 获取随机数据
 char* GetRandData()
 {
@@ -533,9 +554,8 @@ short FindFreeBlock(const int& size)
 	return idx++;
 }
 // 分离路径，并返回INODE 
-// ignore = 0 引用返回最后的INODE，无返回值
-// ignore = 1 忽略最后的Name，返回前面的INODE，并且返回后面Name的char*
-char* Path2INODE(char* path, const int& ignore, INODE& item)
+// 引用返回最后的INODE，无返回值
+bool Path2INODE(char* path, INODE& item)
 {
 	Directory dirTmp;
 	dirTmp = curDirectory;
@@ -545,7 +565,134 @@ char* Path2INODE(char* path, const int& ignore, INODE& item)
 		path += 1;
 	}
 	short len = strlen(path);
-	return nullptr;
+	if (path[len - 1] == '/' || path[0] == '/')
+	{
+		printf("格式错误\n");
+		return 0;
+	}
+	short inoIdx;
+	short i = 0, j = 0;
+	while (i < len && j < len)
+	{
+		while (path[i] != '/' && path[i] != '\0') i++;
+		while (path[j] == '/' || path[j] == '\0') j++;
+		while (i < len && (path[i] == '/' || path[i] == '\0'))
+		{
+			path[i] = '\0';
+			i++;
+		}
+		inoIdx = -1;
+		for (int k = 0; k < DIRECTORY_SIZE; k++)
+		{
+			if (strcmp(dirTmp.item[k].fileName, path + j) == 0)
+			{
+				inoIdx = dirTmp.item[k].ino;
+				break;
+			}
+		}
+		if (inoIdx == -1)
+		{
+			printf("不存在对应文件%s\n", path + j);
+			return 0;
+		}
+		ReadINODE(inoIdx, item);
+		if (i >= len)
+		{
+			return 1;
+		}
+		else
+		{
+			if (item.fmode == 1)
+			{
+				printf("%s是一个文件\n", path + j);
+				return 0;
+			}
+			else
+			{
+				ReadDirectory(item.directBlock[0], dirTmp);
+			}
+		}
+		j = i;
+	}
+	return 1;
+}
+// 分离路径，并返回INODE 
+// 忽略最后的Name，返回前面的INODE，并且返回后面Name的char*
+bool Path2INODE(char* path, INODE& item, char*& ret)
+{
+	Directory dirTmp;
+	dirTmp = curDirectory;
+	if (path[0] == '/') // 回到根节点
+	{
+		ReadDirectory(0, dirTmp);
+		path += 1;
+	}
+	short len = strlen(path);
+	if (path[len - 1] == '/' || path[0] == '/')
+	{
+		printf("格式错误\n");
+		return 0;
+	}
+	short i = len - 1;
+	while (i > 0)
+	{
+		if (path[i] == '/') break;
+		i--;
+	}
+	if (i == 0)
+	{
+		ReadINODE(dirTmp.self.ino, item);
+		ret = path;
+		return 1;
+	}
+	ret = path + i + 1;
+	while (i > 0 && path[i] == '/') i--;
+	len = i + 1;
+	path[len] = '\0';
+	short inoIdx, j;
+	i = j = 0;
+	while (i < len && j < len)
+	{
+		while (path[i] != '/' && path[i] != '\0') i++;
+		while (path[j] == '/' || path[j] == '\0') j++;
+		while (i < len && (path[i] == '/' || path[i] == '\0'))
+		{
+			path[i] = '\0';
+			i++;
+		}
+		inoIdx = -1;
+		for (int k = 0; k < DIRECTORY_SIZE; k++)
+		{
+			if (strcmp(dirTmp.item[k].fileName, path + j) == 0)
+			{
+				inoIdx = dirTmp.item[k].ino;
+				break;
+			}
+		}
+		if (inoIdx == -1)
+		{
+			printf("不存在对应文件%s\n", path + j);
+			return 0;
+		}
+		ReadINODE(inoIdx, item);
+		if (i >= len)
+		{
+			return 1;
+		}
+		else
+		{
+			if (item.fmode == 1)
+			{
+				printf("%s是一个文件\n", path + j);
+				return 0;
+			}
+			else
+			{
+				ReadDirectory(item.directBlock[0], dirTmp);
+			}
+		}
+		j = i;
+	}
 }
 // 回退 SuperBlock,Bitmap
 inline void RollBack()
@@ -829,17 +976,31 @@ void CreateFile(char* fileName, char* strFileSize)
 		printf("Block空间不足\n");
 		return;
 	}
+	INODE inode;
+	if (Path2INODE(fileName, inode, fileName) == 0)
+	{
+		return;
+	}
+	Directory dirTmp;
+	if (inode.ino == curDirectory.self.ino)
+	{
+		dirTmp = curDirectory;
+	}
+	else
+	{
+		ReadDirectory(inode.ino, dirTmp);
+	}
 	// 检查是否重名
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
 	{
-		if (strcmp(fileName, curDirectory.item[i].fileName) == 0)
+		if (strcmp(fileName, dirTmp.item[i].fileName) == 0)
 		{
 			printf("无法创建重名文件\n");
 			return;
 		}
 	}
 	// 分配INODE
-	if (curDirectory.itemNum >= DIRECTORY_SIZE)
+	if (dirTmp.itemNum >= DIRECTORY_SIZE)
 	{
 		printf("文件夹已满上限(20)\n");
 		return;
@@ -850,7 +1011,6 @@ void CreateFile(char* fileName, char* strFileSize)
 		printf("INODE空间不足\n");
 		return;
 	}
-	INODE inode;
 	inode.init();
 	inode.ino = inoIdx;
 	inode.fmode = 1;
@@ -859,11 +1019,11 @@ void CreateFile(char* fileName, char* strFileSize)
 	inode.createTime = time(0);
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
 	{
-		if (curDirectory.item[i].ino == -1)
+		if (dirTmp.item[i].ino == -1)
 		{
-			curDirectory.itemNum++;
-			strcpy(curDirectory.item[i].fileName, fileName);
-			curDirectory.item[i].ino = inoIdx;
+			dirTmp.itemNum++;
+			strcpy(dirTmp.item[i].fileName, fileName);
+			dirTmp.item[i].ino = inoIdx;
 			break;
 		}
 	}
@@ -989,7 +1149,11 @@ void CreateFile(char* fileName, char* strFileSize)
 		RollBack();
 		return;
 	}
-	WriteDirectory(curDirectory.blockIdx, curDirectory);
+	if (curDirectory.self.ino == dirTmp.self.ino)
+	{
+		curDirectory = dirTmp;
+	}
+	WriteDirectory(dirTmp.blockIdx, dirTmp);
 	WriteINODE(inoIdx, inode);
 	WriteSuperBlock(superBlock);
 	WriteBitmapINODE();
@@ -998,12 +1162,26 @@ void CreateFile(char* fileName, char* strFileSize)
 // 删除文件 deleteFile fileName
 void DeleteFile(char* fileName)
 {
+	INODE inodeTmp;
+	if (Path2INODE(fileName, inodeTmp, fileName) == 0)
+	{
+		return;
+	}
+	Directory dirTmp;
+	if (curDirectory.self.ino == inodeTmp.ino)
+	{
+		dirTmp = curDirectory;
+	}
+	else
+	{
+		ReadDirectory(inodeTmp.ino, dirTmp);
+	}
 	int inoIdx = -1;
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
 	{
-		if (strcmp(fileName, curDirectory.item[i].fileName) == 0)
+		if (strcmp(fileName, dirTmp.item[i].fileName) == 0)
 		{
-			inoIdx = curDirectory.item[i].ino;
+			inoIdx = dirTmp.item[i].ino;
 			break;
 		}
 	}
@@ -1012,7 +1190,6 @@ void DeleteFile(char* fileName)
 		printf("不存在对应文件\n");
 		return;
 	}
-	INODE inodeTmp;
 	ReadINODE(inoIdx, inodeTmp);
 	if (inodeTmp.fmode == 0)
 	{
@@ -1021,16 +1198,20 @@ void DeleteFile(char* fileName)
 	}
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
 	{
-		if (inoIdx == curDirectory.item[i].ino)
+		if (inoIdx == dirTmp.item[i].ino)
 		{
-			curDirectory.itemNum -= 1;
-			curDirectory.item[i].ino = -1;
-			memset(curDirectory.item[i].fileName, 0, sizeof(curDirectory.item[i].fileName));
+			dirTmp.itemNum -= 1;
+			dirTmp.item[i].ino = -1;
+			memset(dirTmp.item[i].fileName, 0, sizeof(dirTmp.item[i].fileName));
 			break;
 		}
 	}
 	DeleteINODE(inodeTmp);
-	WriteDirectory(curDirectory.blockIdx, curDirectory);
+	if (curDirectory.self.ino == dirTmp.self.ino)
+	{
+		curDirectory = dirTmp;
+	}
+	WriteDirectory(dirTmp.blockIdx, dirTmp);
 }
 // 创建文件夹 createDir dirName
 void CreateDir(char* dirName)
@@ -1040,15 +1221,29 @@ void CreateDir(char* dirName)
 		printf("INODE空间不足\n");
 		return;
 	}
+	INODE inode;
+	if (Path2INODE(dirName, inode, dirName) == 0)
+	{
+		return;
+	}
+	Directory dirTmp;
+	if (curDirectory.self.ino == inode.ino)
+	{
+		dirTmp = curDirectory;
+	}
+	else
+	{
+		ReadDirectory(inode.ino, dirTmp);
+	}
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
 	{
-		if (strcmp(dirName, curDirectory.item[i].fileName) == 0)
+		if (strcmp(dirName, dirTmp.item[i].fileName) == 0)
 		{
 			printf("无法创建重名文件\n");
 			return;
 		}
 	}
-	if (curDirectory.itemNum >= DIRECTORY_SIZE)
+	if (dirTmp.itemNum >= DIRECTORY_SIZE)
 	{
 		printf("文件夹已满上限(20)\n");
 		return;
@@ -1059,7 +1254,6 @@ void CreateDir(char* dirName)
 		printf("INODE空间不足\n");
 		return;
 	}
-	INODE inode;
 	inode.init();
 	inode.ino = inoIdx;
 	inode.fmode = 0;
@@ -1068,11 +1262,11 @@ void CreateDir(char* dirName)
 	inode.createTime = time(0);
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
 	{
-		if (curDirectory.item[i].ino == -1)
+		if (dirTmp.item[i].ino == -1)
 		{
-			curDirectory.itemNum++;
-			strcpy(curDirectory.item[i].fileName, dirName);
-			curDirectory.item[i].ino = inoIdx;
+			dirTmp.itemNum++;
+			strcpy(dirTmp.item[i].fileName, dirName);
+			dirTmp.item[i].ino = inoIdx;
 			break;
 		}
 	}
@@ -1084,14 +1278,19 @@ void CreateDir(char* dirName)
 		RollBack();
 		return;
 	}
-	Directory dirTmp;
-	dirTmp.Init();
-	dirTmp.father = curDirectory.self;
-	strcpy(dirTmp.self.fileName, dirName);
-	dirTmp.self.ino = inoIdx;
-	dirTmp.blockIdx = inode.directBlock[0];
-	WriteDirectory(curDirectory.blockIdx, curDirectory);
-	WriteDirectory(inode.directBlock[0], dirTmp);
+	Directory dirTmp2;
+	dirTmp2.Init();
+	dirTmp2.father = dirTmp.self;
+	strcpy(dirTmp2.self.fileName, dirName);
+	dirTmp2.self.ino = inoIdx;
+	dirTmp2.blockIdx = inode.directBlock[0];
+	if (curDirectory.self.ino == dirTmp.self.ino)
+	{
+		curDirectory = dirTmp;
+	}
+	useBlock(inode.directBlock[0]);
+	WriteDirectory(dirTmp.blockIdx, dirTmp);
+	WriteDirectory(inode.directBlock[0], dirTmp2);
 	WriteINODE(inoIdx, inode);
 	WriteSuperBlock(superBlock);
 	WriteBitmapINODE();
@@ -1101,11 +1300,25 @@ void CreateDir(char* dirName)
 void DeleteDir(char* dirName)
 {
 	int inoIdx = -1;
+	INODE inodeTmp;
+	if (Path2INODE(dirName, inodeTmp, dirName) == 0)
+	{
+		return;
+	}
+	Directory dirTmp;
+	if (inodeTmp.ino == curDirectory.self.ino)
+	{
+		dirTmp = curDirectory;
+	}
+	else
+	{
+		ReadDirectory(inodeTmp.ino, dirTmp);
+	}
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
 	{
-		if (strcmp(curDirectory.item[i].fileName, dirName) == 0)
+		if (strcmp(dirTmp.item[i].fileName, dirName) == 0)
 		{
-			inoIdx = curDirectory.item[i].ino;
+			inoIdx = dirTmp.item[i].ino;
 			break;
 		}
 	}
@@ -1114,7 +1327,6 @@ void DeleteDir(char* dirName)
 		printf("不存在对应文件夹\n");
 		return;
 	}
-	INODE inodeTmp;
 	ReadINODE(inoIdx, inodeTmp);
 	if (inodeTmp.fmode == 1)
 	{
@@ -1123,35 +1335,32 @@ void DeleteDir(char* dirName)
 	}
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
 	{
-		if (inoIdx == curDirectory.item[i].ino)
+		if (inoIdx == dirTmp.item[i].ino)
 		{
-			curDirectory.itemNum -= 1;
-			curDirectory.item[i].ino = -1;
-			memset(curDirectory.item[i].fileName, 0, sizeof(curDirectory.item[i].fileName));
+			dirTmp.itemNum -= 1;
+			dirTmp.item[i].ino = -1;
+			memset(dirTmp.item[i].fileName, 0, sizeof(dirTmp.item[i].fileName));
 			break;
 		}
 	}
 	DeleteINODE(inodeTmp);
-	WriteDirectory(curDirectory.blockIdx, curDirectory);
+	if (dirTmp.self.ino == curDirectory.self.ino)
+	{
+		curDirectory = dirTmp;
+	}
+	WriteDirectory(dirTmp.blockIdx, dirTmp);
 }
 // 改变当前工作路径 changeDir path
 void ChangeDir(char* path)
 {
+	char* pathCp = path;
 	if (strcmp(path, "..") == 0)
 	{
 		INODE inodeTmp;
 		ReadINODE(curDirectory.father.ino, inodeTmp);
 		ReadDirectory(inodeTmp.directBlock[0], curDirectory);
-		int i = strlen(curPathName);
-		while (i--)
-		{
-			if (curPathName[i] == '/')
-			{
-				curPathName[i] = '\0';
-				break;
-			}
-		}
-		if (i == 0)
+		CplPath(inodeTmp);
+		if (curPathName[0] == '\0')
 		{
 			curPathName[0] = '/';
 			curPathName[1] = '\0';
@@ -1163,40 +1372,23 @@ void ChangeDir(char* path)
 		return;
 	}
 	int inoIdx = -1;
-	for (int i = 0; i < DIRECTORY_SIZE; i++)
+	INODE inodeTmp;
+	if (Path2INODE(path, inodeTmp) == 0)
 	{
-		if (strcmp(curDirectory.item[i].fileName, path) == 0)
-		{
-			inoIdx = curDirectory.item[i].ino;
-			break;
-		}
-	}
-	if (inoIdx == -1)
-	{
-		printf("不存在对应文件夹\n");
 		return;
 	}
-	INODE inodeTmp;
-	ReadINODE(inoIdx, inodeTmp);
 	if (inodeTmp.fmode == 1)
 	{
 		printf("对应文件为文件\n");
 		return;
 	}
 	ReadDirectory(inodeTmp.directBlock[0], curDirectory);
-	short len1 = strlen(curPathName);
-	short len2 = strlen(curDirectory.self.fileName);
-	int i = 0, j = len1;
-	if (j != 1)
+	CplPath(inodeTmp);
+	if (curPathName[0] == '\0')
 	{
-		curPathName[j++] = '/';
+		curPathName[0] = '/';
+		curPathName[1] = '\0';
 	}
-	while (i < len2)
-	{
-		curPathName[j] = curDirectory.self.fileName[i];
-		i++, j++;
-	}
-	curPathName[j] = '\0';
 }
 // 列出当前目录下的文件和子目录及对应信息(SIZE CREATETIME) dir
 void Dir()
@@ -1225,16 +1417,41 @@ void Cp(char* fileName1, char* fileName2)
 {
 	INODE inodeTmp1, inodeTmp2;
 	short inoIdx1 = -1, inoIdx2 = -1;
+	if (Path2INODE(fileName1, inodeTmp1, fileName1) == 0)
+	{
+		return;
+	}
+	if (Path2INODE(fileName2, inodeTmp2, fileName2) == 0)
+	{
+		return;
+	}
+	Directory dirTmp1, dirTmp2;
+	if (curDirectory.self.ino == inodeTmp1.ino)
+	{
+		dirTmp1 = curDirectory;
+	}
+	else
+	{
+		ReadDirectory(inodeTmp1.ino, dirTmp1);
+	}
+	if (curDirectory.self.ino == inodeTmp2.ino)
+	{
+		dirTmp2 = curDirectory;
+	}
+	else
+	{
+		ReadDirectory(inodeTmp2.ino, dirTmp2);
+	}
 	// 处理fileName2创建问题
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
 	{
-		if (strcmp(fileName2, curDirectory.item[i].fileName) == 0)
+		if (strcmp(fileName2, dirTmp2.item[i].fileName) == 0)
 		{
 			printf("无法创建重名文件\n");
 			return;
 		}
 	}
-	if (curDirectory.itemNum >= DIRECTORY_SIZE)
+	if (dirTmp2.itemNum >= DIRECTORY_SIZE)
 	{
 		printf("文件夹已满上限(20)\n");
 		return;
@@ -1248,9 +1465,9 @@ void Cp(char* fileName1, char* fileName2)
 	// 处理fileName1的INODE
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
 	{
-		if (strcmp(fileName1, curDirectory.item[i].fileName) == 0)
+		if (strcmp(fileName1, dirTmp1.item[i].fileName) == 0)
 		{
-			inoIdx1 = curDirectory.item[i].ino;
+			inoIdx1 = dirTmp1.item[i].ino;
 			break;
 		}
 	}
@@ -1292,11 +1509,11 @@ void Cp(char* fileName1, char* fileName2)
 	inodeTmp2.createTime = time(0);
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
 	{
-		if (curDirectory.item[i].ino == -1)
+		if (dirTmp2.item[i].ino == -1)
 		{
-			curDirectory.itemNum++;
-			strcpy(curDirectory.item[i].fileName, fileName2);
-			curDirectory.item[i].ino = inoIdx2;
+			dirTmp2.itemNum++;
+			strcpy(dirTmp2.item[i].fileName, fileName2);
+			dirTmp2.item[i].ino = inoIdx2;
 			break;
 		}
 	}
@@ -1431,7 +1648,11 @@ void Cp(char* fileName1, char* fileName2)
 		return;
 	}
 	// 更新fileName2的信息
-	WriteDirectory(curDirectory.blockIdx, curDirectory);
+	if (dirTmp2.self.ino == curDirectory.self.ino)
+	{
+		curDirectory = dirTmp2;
+	}
+	WriteDirectory(dirTmp2.blockIdx, dirTmp2);
 	WriteINODE(inoIdx2, inodeTmp2);
 	WriteSuperBlock(superBlock);
 	WriteBitmapINODE();
@@ -1454,11 +1675,24 @@ void Cat(char* fileName)
 {
 	INODE inodeTmp;
 	short inoIdx = -1;
+	if (Path2INODE(fileName, inodeTmp, fileName) == 0)
+	{
+		return;
+	}
+	Directory dirTmp;
+	if (curDirectory.self.ino == inodeTmp.ino)
+	{
+		dirTmp = curDirectory;
+	}
+	else
+	{
+		ReadDirectory(inodeTmp.ino, dirTmp);
+	}
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
 	{
-		if (strcmp(fileName, curDirectory.item[i].fileName) == 0)
+		if (strcmp(fileName, dirTmp.item[i].fileName) == 0)
 		{
-			inoIdx = curDirectory.item[i].ino;
+			inoIdx = dirTmp.item[i].ino;
 			break;
 		}
 	}
