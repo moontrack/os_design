@@ -248,41 +248,41 @@ bool Parse(char* cmd);
 
 int main()
 {
-	// test //
-	printf("INODE size = %d\n", sizeof(INODE));
-	printf("IndirectionBlock size = %d\n", sizeof(IndirectionBlock));
-	printf("SuperBlock size = %d\n", sizeof(SuperBlock));
-	printf("DirectoryElement size = %d\n", sizeof(DirectoryElement));
-	printf("Directory size = %d\n", sizeof(Directory));
-	printf("superBlock size = %d\n", sizeof(superBlock));
-	printf("inodeBitmap size = %d\n", sizeof(inodeBitmap));
-	printf("blockBitmap size = %d\n", sizeof(blockBitmap));
-	printf("curDirectory size = %d\n", sizeof(curDirectory));
-	printf("LIMIT_ONE_INDIRECT_BLOCK = %d\n", LIMIT_ONE_INDIRECT_BLOCK);
-	printf("LIMIT_DIRECT_BLOCK = %d\n", LIMIT_DIRECT_BLOCK);
-	printf("MUL_INDIRECT_BLOCK_NUM = %d\n", MUL_INDIRECT_BLOCK_NUM);
-	int test_A = -1;
-	printf("%d\n", test_A);
-	printf("%d\n", 16 * 1024);
-	short test_B = -1;
-	printf("%d\n", test_B);
-	printf("time_t size = %d\n", sizeof(time_t));
-	time_t tmpt = time(0);
-	printf("time_t = %s\n", ctime(&tmpt));
-	char test_str[40];
-	memset(test_str, 0, sizeof(test_str));
-	strcpy(test_str, "1231412412");
-	printf("str %s\n", test_str);
-	for (int i = ' '; i <= '~'; i++)
-	{
-		printf("%c ", i);
-	}
-	printf("%d\n", '~' - ' ');
-	printf("\n");
-	//////////
-	char strrr[] = "123";
-	printf("%s\n", strcat(strrr, "456"));
-	// end  //
+	//// test //
+	//printf("INODE size = %d\n", sizeof(INODE));
+	//printf("IndirectionBlock size = %d\n", sizeof(IndirectionBlock));
+	//printf("SuperBlock size = %d\n", sizeof(SuperBlock));
+	//printf("DirectoryElement size = %d\n", sizeof(DirectoryElement));
+	//printf("Directory size = %d\n", sizeof(Directory));
+	//printf("superBlock size = %d\n", sizeof(superBlock));
+	//printf("inodeBitmap size = %d\n", sizeof(inodeBitmap));
+	//printf("blockBitmap size = %d\n", sizeof(blockBitmap));
+	//printf("curDirectory size = %d\n", sizeof(curDirectory));
+	//printf("LIMIT_ONE_INDIRECT_BLOCK = %d\n", LIMIT_ONE_INDIRECT_BLOCK);
+	//printf("LIMIT_DIRECT_BLOCK = %d\n", LIMIT_DIRECT_BLOCK);
+	//printf("MUL_INDIRECT_BLOCK_NUM = %d\n", MUL_INDIRECT_BLOCK_NUM);
+	//int test_A = -1;
+	//printf("%d\n", test_A);
+	//printf("%d\n", 16 * 1024);
+	//short test_B = -1;
+	//printf("%d\n", test_B);
+	//printf("time_t size = %d\n", sizeof(time_t));
+	//time_t tmpt = time(0);
+	//printf("time_t = %s\n", ctime(&tmpt));
+	//char test_str[40];
+	//memset(test_str, 0, sizeof(test_str));
+	//strcpy(test_str, "1231412412");
+	//printf("str %s\n", test_str);
+	//for (int i = ' '; i <= '~'; i++)
+	//{
+	//	printf("%c ", i);
+	//}
+	//printf("%d\n", '~' - ' ');
+	//printf("\n");
+	////////////
+	//char strrr[] = "123";
+	//printf("%s\n", strcat(strrr, "456"));
+	//// end  //
 
 	if (Welcome())
 	{
@@ -910,16 +910,6 @@ void Help()
 // 欢迎信息
 void WelcomeMsg()
 {
-	//cout << "* *************************** Chinese Group 16 *************************** *" << endl;
-	//cout << "*                                                                          *" << endl;
-	//cout << "*                     Welcome to our Unix file system!                     *" << endl;
-	//cout << "*                                                                          *" << endl;
-	//cout << "*         Members:		                                                    *" << endl;
-	//cout << "*                          黄宗达 -- 201830570149                          *" << endl;
-	//cout << "*                          徐自华 -- 201830570354                          *" << endl;
-	//cout << "*                          王  葳 -- 201830570316                          *" << endl;
-	//cout << "*                                                                          *" << endl;
-	//cout << "* ************************************************************************ *" << endl << endl;
 	printf("* *************************** Chinese Group 16 *************************** *\n");
 	printf("*                                                                          *\n");
 	printf("*                     Welcome to our Unix file system!                     *\n");
