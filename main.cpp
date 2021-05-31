@@ -471,7 +471,7 @@ int str2int(char* str)
 char* CplPath(INODE item)
 {
 	Directory dirTmp;
-	ReadDirectory(item.ino, dirTmp);
+	ReadDirectory(item.directBlock[0], dirTmp);
 	if (dirTmp.father.ino == dirTmp.self.ino)
 	{
 		curPathName[0] = '\0';
@@ -978,7 +978,7 @@ void CreateFile(char* fileName, char* strFileSize)
 	}
 	else
 	{
-		ReadDirectory(inode.ino, dirTmp);
+		ReadDirectory(inode.directBlock[0], dirTmp);
 	}
 	// 检查是否重名
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
@@ -1164,7 +1164,7 @@ void DeleteFile(char* fileName)
 	}
 	else
 	{
-		ReadDirectory(inodeTmp.ino, dirTmp);
+		ReadDirectory(inodeTmp.directBlock[0], dirTmp);
 	}
 	int inoIdx = -1;
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
@@ -1223,7 +1223,7 @@ void CreateDir(char* dirName)
 	}
 	else
 	{
-		ReadDirectory(inode.ino, dirTmp);
+		ReadDirectory(inode.directBlock[0], dirTmp);
 	}
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
 	{
@@ -1302,7 +1302,7 @@ void DeleteDir(char* dirName)
 	}
 	else
 	{
-		ReadDirectory(inodeTmp.ino, dirTmp);
+		ReadDirectory(inodeTmp.directBlock[0], dirTmp);
 	}
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
 	{
@@ -1422,7 +1422,7 @@ void Cp(char* fileName1, char* fileName2)
 	}
 	else
 	{
-		ReadDirectory(inodeTmp1.ino, dirTmp1);
+		ReadDirectory(inodeTmp1.directBlock[0], dirTmp1);
 	}
 	if (curDirectory.self.ino == inodeTmp2.ino)
 	{
@@ -1430,7 +1430,7 @@ void Cp(char* fileName1, char* fileName2)
 	}
 	else
 	{
-		ReadDirectory(inodeTmp2.ino, dirTmp2);
+		ReadDirectory(inodeTmp2.directBlock[0], dirTmp2);
 	}
 	// 处理fileName2创建问题
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
@@ -1676,7 +1676,7 @@ void Cat(char* fileName)
 	}
 	else
 	{
-		ReadDirectory(inodeTmp.ino, dirTmp);
+		ReadDirectory(inodeTmp.directBlock[0], dirTmp);
 	}
 	for (int i = 0; i < DIRECTORY_SIZE; i++)
 	{
