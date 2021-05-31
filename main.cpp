@@ -935,11 +935,6 @@ bool Welcome()
 // 创建文件 createFile fileName fileSize (KB)
 void CreateFile(char* fileName, char* strFileSize)
 {
-	if (strlen(fileName) > PATH_NAME_LEN)
-	{
-		printf("文件名过长，最大长度为20\n");
-		return;
-	}
 	if (superBlock.finodeNum <= 0)
 	{
 		printf("INODE空间不足\n");
@@ -973,6 +968,11 @@ void CreateFile(char* fileName, char* strFileSize)
 	INODE inode;
 	if (Path2INODE(fileName, inode, fileName) == 0)
 	{
+		return;
+	}
+	if (strlen(fileName) > PATH_NAME_LEN)
+	{
+		printf("文件名过长，最大长度为20\n");
 		return;
 	}
 	Directory dirTmp;
@@ -1210,11 +1210,6 @@ void DeleteFile(char* fileName)
 // 创建文件夹 createDir dirName
 void CreateDir(char* dirName)
 {
-	if (strlen(dirName) > PATH_NAME_LEN)
-	{
-		printf("文件夹名过长，最大长度为20\n");
-		return;
-	}
 	if (superBlock.finodeNum <= 0)
 	{
 		printf("INODE空间不足\n");
@@ -1223,6 +1218,11 @@ void CreateDir(char* dirName)
 	INODE inode;
 	if (Path2INODE(dirName, inode, dirName) == 0)
 	{
+		return;
+	}
+	if (strlen(dirName) > PATH_NAME_LEN)
+	{
+		printf("文件夹名过长，最大长度为20\n");
 		return;
 	}
 	Directory dirTmp;
@@ -1414,11 +1414,6 @@ void Dir()
 // 暂时只实现文件复制
 void Cp(char* fileName1, char* fileName2)
 {
-	if (strlen(fileName2) > PATH_NAME_LEN)
-	{
-		printf("文件名过长，最大长度为20\n");
-		return;
-	}
 	INODE inodeTmp1, inodeTmp2;
 	short inoIdx1 = -1, inoIdx2 = -1;
 	if (Path2INODE(fileName1, inodeTmp1, fileName1) == 0)
@@ -1427,6 +1422,11 @@ void Cp(char* fileName1, char* fileName2)
 	}
 	if (Path2INODE(fileName2, inodeTmp2, fileName2) == 0)
 	{
+		return;
+	}
+	if (strlen(fileName2) > PATH_NAME_LEN)
+	{
+		printf("文件名过长，最大长度为20\n");
 		return;
 	}
 	Directory dirTmp1, dirTmp2;
