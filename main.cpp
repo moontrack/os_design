@@ -233,7 +233,7 @@ void ChangeDir(char* path);
 void Dir();
 // 复制文件 cp file1 file2
 // 暂时只实现文件复制
-void Cp(char* file1, char* file2);
+void Cp(char* fileName1, char* fileName2);
 // 显示空间使用信息 sum
 void Sum();
 // 打印文件内容 cat fileName
