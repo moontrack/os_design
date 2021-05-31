@@ -970,7 +970,7 @@ void CreateFile(char* fileName, char* strFileSize)
 	{
 		return;
 	}
-	if (strlen(fileName) > PATH_NAME_LEN)
+	if (strlen(fileName) > FILE_NAME_LEN)
 	{
 		printf("文件名过长，最大长度为20\n");
 		return;
@@ -1220,7 +1220,7 @@ void CreateDir(char* dirName)
 	{
 		return;
 	}
-	if (strlen(dirName) > PATH_NAME_LEN)
+	if (strlen(dirName) > FILE_NAME_LEN)
 	{
 		printf("文件夹名过长，最大长度为20\n");
 		return;
@@ -1424,7 +1424,7 @@ void Cp(char* fileName1, char* fileName2)
 	{
 		return;
 	}
-	if (strlen(fileName2) > PATH_NAME_LEN)
+	if (strlen(fileName2) > FILE_NAME_LEN)
 	{
 		printf("文件名过长，最大长度为20\n");
 		return;
