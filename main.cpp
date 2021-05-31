@@ -130,6 +130,7 @@ bool blockBitmap[BLOCK_NUM];							// 0 表示未使用
 Directory curDirectory;									// 当前打开的文件夹
 FILE* file;												// 文件系统
 char randData[BLOCK_SIZE];								// 随机数据
+char curPathName[PATH_NAME_LEN] = "/";					// 当前路径
 #pragma endregion
 
 #pragma region File_Function
@@ -210,8 +211,6 @@ bool Init();
 #pragma endregion
 
 #pragma region Command
-// 当前路径
-char curPathName[PATH_NAME_LEN] = "/";
 // 启动载入磁盘
 bool Start();
 // 帮助信息
