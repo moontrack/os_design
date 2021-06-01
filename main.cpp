@@ -856,7 +856,7 @@ bool Init()
 		fseek(file, STORAGE_START + blockIdx * BLOCK_SIZE, 0);
 		fwrite(&curDirectory, sizeof(Directory), 1, file);
 		printf("初始化完毕\n");
-		//fclose(file);
+		fclose(file);
 	}
 	else
 	{
